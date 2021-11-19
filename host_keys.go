@@ -94,6 +94,7 @@ func (key *HostKey) Save(fileName string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(key.key)
 	if err != nil {
 		return err
