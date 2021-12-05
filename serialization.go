@@ -88,7 +88,7 @@ func unmarshalBytes(data []byte) ([][]byte, error) {
 			return nil, err
 		}
 		result = append(result, []byte(b.Bytes))
-		data = []byte(b.Rest)
+		data = b.Rest
 	}
 	return result, nil
 }
