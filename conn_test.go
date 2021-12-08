@@ -2,6 +2,7 @@ package sshutils_test
 
 import (
 	"bytes"
+	"regexp"
 	"testing"
 
 	"github.com/jaksi/sshutils"
@@ -29,12 +30,23 @@ func TestConn(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clientConnection.Close()
+
+	expectedString := regexp.MustCompile(`^client 127\.0\.0\.1:\d+ - 127\.0\.0\.1:2022$`)
+	if !expectedString.MatchString(clientConnection.String()) {
+		t.Errorf("clientConnection.String() = %v, want match for %v", clientConnection.String(), expectedString)
+	}
+
 	serverConnection := <-serverConnections
 	defer serverConnection.Close()
 
+	expectedString = regexp.MustCompile(`^server 127\.0\.0\.1:2022 - 127\.0\.0\.1:\d+$`)
+	if !expectedString.MatchString(serverConnection.String()) {
+		t.Errorf("serverConnection.String() = %v, want match for %v", serverConnection.String(), expectedString)
+	}
+
 	clientC2SChan := make(chan *sshutils.Channel)
 	go func() {
-		clientC2S, err := clientConnection.OpenChannel("c2s", []byte{0x42})
+		clientC2S, err := clientConnection.NewChannel("c2s", []byte{0x42})
 		if err != nil {
 			t.Error(err)
 		}
@@ -47,17 +59,26 @@ func TestConn(t *testing.T) {
 	if !bytes.Equal(newServerC2S.ExtraData(), []byte{0x42}) {
 		t.Fatalf("serverC2S.ExtraData() = %v, want %v", newServerC2S.ExtraData(), []byte{0x42})
 	}
-	serverC2S, err := newServerC2S.Accept()
+	if newServerC2S.String() != "c2s" {
+		t.Errorf("serverC2S.String() = %v, want %v", newServerC2S.String(), "c2s")
+	}
+	serverC2S, err := newServerC2S.AcceptChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
+	if serverC2S.String() != serverC2S.ChannelID() {
+		t.Errorf("serverC2S.String() = %v, want %v", serverC2S.String(), serverC2S.ChannelID())
+	}
 	clientC2S := <-clientC2SChan
+	if clientC2S.String() != clientC2S.ChannelID() {
+		t.Errorf("clientC2S.String() = %v, want %v", clientC2S.String(), clientC2S.ChannelID())
+	}
 	if clientC2S.ChannelID() != serverC2S.ChannelID() {
 		t.Fatalf("clientC2S.ChannelID() = %v, want %v", clientC2S.ChannelID(), serverC2S.ChannelID())
 	}
 
 	go func() {
-		if _, err := clientConnection.OpenChannel("c2s_fail", []byte{0x43}); err == nil {
+		if _, err := clientConnection.NewChannel("c2s_fail", []byte{0x43}); err == nil {
 			t.Error("OpenChannel(c2s_fail) should fail")
 		}
 	}()
@@ -74,7 +95,7 @@ func TestConn(t *testing.T) {
 
 	serverS2CChan := make(chan *sshutils.Channel)
 	go func() {
-		serverS2C, err := serverConnection.OpenChannel("s2c", []byte{0x44})
+		serverS2C, err := serverConnection.NewChannel("s2c", []byte{0x44})
 		if err != nil {
 			t.Error(err)
 		}
@@ -87,17 +108,26 @@ func TestConn(t *testing.T) {
 	if !bytes.Equal(newClientS2C.ExtraData(), []byte{0x44}) {
 		t.Fatalf("clientS2C.ExtraData() = %v, want %v", newClientS2C.ExtraData(), []byte{0x44})
 	}
-	clientS2C, err := newClientS2C.Accept()
+	if newClientS2C.String() != "s2c" {
+		t.Errorf("clientS2C.String() = %v, want %v", newClientS2C.String(), "s2c")
+	}
+	clientS2C, err := newClientS2C.AcceptChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
+	if clientS2C.String() != clientS2C.ChannelID() {
+		t.Errorf("clientS2C.String() = %v, want %v", clientS2C.String(), clientS2C.ChannelID())
+	}
 	serverS2C := <-serverS2CChan
+	if serverS2C.String() != serverS2C.ChannelID() {
+		t.Errorf("serverS2C.String() = %v, want %v", serverS2C.String(), serverS2C.ChannelID())
+	}
 	if serverS2C.ChannelID() != clientS2C.ChannelID() {
 		t.Fatalf("serverS2C.ChannelID() = %v, want %v", serverS2C.ChannelID(), clientS2C.ChannelID())
 	}
 
 	go func() {
-		if _, err := serverConnection.OpenChannel("s2c_fail", []byte{0x45}); err == nil {
+		if _, err := serverConnection.NewChannel("s2c_fail", []byte{0x45}); err == nil {
 			t.Error("OpenChannel(s2c_fail) should fail")
 		}
 	}()
