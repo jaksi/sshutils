@@ -66,6 +66,7 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 		Requests:    requests,
 	}
 	go func() {
+		defer close(newChannels)
 		for sshNewChannel := range sshNewChannels {
 			newChannels <- &NewChannel{sshNewChannel, connection}
 		}
@@ -99,6 +100,7 @@ func Listen(address string, config *ssh.ServerConfig) (<-chan *Conn, error) {
 				Requests:    requests,
 			}
 			go func() {
+				defer close(newChannels)
 				for sshNewChannel := range sshNewChannels {
 					newChannels <- &NewChannel{sshNewChannel, connection}
 				}
