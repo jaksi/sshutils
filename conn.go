@@ -38,7 +38,7 @@ func (conn *Conn) NewChannel(name string, data []byte) (*Channel, error) {
 	if err != nil {
 		return nil, err
 	}
-	channel := &Channel{sshChannel, requests, fmt.Sprint(conn.nextChannelID)}
+	channel := &Channel{sshChannel, requests, fmt.Sprint(conn.nextChannelID), name, conn}
 	conn.nextChannelID++
 	return channel, nil
 }
@@ -57,7 +57,7 @@ func (newChannel *NewChannel) AcceptChannel() (*Channel, error) {
 	if err != nil {
 		return nil, err
 	}
-	channel := &Channel{sshChannel, requests, fmt.Sprint(newChannel.conn.nextChannelID)}
+	channel := &Channel{sshChannel, requests, fmt.Sprint(newChannel.conn.nextChannelID), newChannel.ChannelType(), newChannel.conn}
 	newChannel.conn.nextChannelID++
 	return channel, nil
 }
@@ -70,18 +70,32 @@ func (newChannel *NewChannel) Payload() (Payload, error) {
 	return UnmarshalNewChannelPayload(newChannel)
 }
 
+func (newChannel *NewChannel) ConnMetadata() ssh.ConnMetadata {
+	return newChannel.conn
+}
+
 type Channel struct {
 	ssh.Channel
-	Requests  <-chan *ssh.Request
-	channelID string
+	Requests    <-chan *ssh.Request
+	channelID   string
+	channelType string
+	conn        *Conn
 }
 
 func (channel *Channel) ChannelID() string {
 	return channel.channelID
 }
 
+func (channel *Channel) ChannelType() string {
+	return channel.channelType
+}
+
 func (channel *Channel) String() string {
-	return channel.channelID
+	return channel.channelType
+}
+
+func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
+	return channel.conn
 }
 
 func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {

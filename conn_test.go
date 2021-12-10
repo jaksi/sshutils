@@ -62,19 +62,34 @@ func TestConn(t *testing.T) {
 	if newServerC2S.String() != "c2s" {
 		t.Errorf("serverC2S.String() = %v, want %v", newServerC2S.String(), "c2s")
 	}
+	if !bytes.Equal(newServerC2S.ConnMetadata().SessionID(), clientConnection.SessionID()) {
+		t.Errorf("serverC2S.ConnMetadata().SessionID() = %v, want %v", newServerC2S.ConnMetadata().SessionID(), clientConnection.SessionID())
+	}
 	serverC2S, err := newServerC2S.AcceptChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if serverC2S.String() != serverC2S.ChannelID() {
-		t.Errorf("serverC2S.String() = %v, want %v", serverC2S.String(), serverC2S.ChannelID())
+	if serverC2S.String() != "c2s" {
+		t.Errorf("serverC2S.String() = %v, want %v", serverC2S.String(), "c2s")
+	}
+	if serverC2S.ChannelType() != "c2s" {
+		t.Errorf("serverC2S.ChannelType() = %v, want %v", serverC2S.ChannelType(), "c2s")
+	}
+	if !bytes.Equal(serverC2S.ConnMetadata().SessionID(), serverConnection.SessionID()) {
+		t.Errorf("serverC2S.ConnMetadata().SessionID() = %v, want %v", serverC2S.ConnMetadata().SessionID(), serverConnection.SessionID())
 	}
 	clientC2S := <-clientC2SChan
-	if clientC2S.String() != clientC2S.ChannelID() {
-		t.Errorf("clientC2S.String() = %v, want %v", clientC2S.String(), clientC2S.ChannelID())
+	if clientC2S.String() != "c2s" {
+		t.Errorf("clientC2S.String() = %v, want %v", clientC2S.String(), "c2s")
 	}
 	if clientC2S.ChannelID() != serverC2S.ChannelID() {
 		t.Fatalf("clientC2S.ChannelID() = %v, want %v", clientC2S.ChannelID(), serverC2S.ChannelID())
+	}
+	if clientC2S.ChannelType() != "c2s" {
+		t.Errorf("clientC2S.ChannelType() = %v, want %v", clientC2S.ChannelType(), "c2s")
+	}
+	if !bytes.Equal(clientC2S.ConnMetadata().SessionID(), clientConnection.SessionID()) {
+		t.Errorf("clientC2S.ConnMetadata().SessionID() = %v, want %v", clientC2S.ConnMetadata().SessionID(), clientConnection.SessionID())
 	}
 
 	go func() {
@@ -111,19 +126,34 @@ func TestConn(t *testing.T) {
 	if newClientS2C.String() != "s2c" {
 		t.Errorf("clientS2C.String() = %v, want %v", newClientS2C.String(), "s2c")
 	}
+	if !bytes.Equal(newClientS2C.ConnMetadata().SessionID(), serverConnection.SessionID()) {
+		t.Errorf("clientS2C.ConnMetadata().SessionID() = %v, want %v", newClientS2C.ConnMetadata().SessionID(), serverConnection.SessionID())
+	}
 	clientS2C, err := newClientS2C.AcceptChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if clientS2C.String() != clientS2C.ChannelID() {
-		t.Errorf("clientS2C.String() = %v, want %v", clientS2C.String(), clientS2C.ChannelID())
+	if clientS2C.String() != "s2c" {
+		t.Errorf("clientS2C.String() = %v, want %v", clientS2C.String(), "s2c")
+	}
+	if clientS2C.ChannelType() != "s2c" {
+		t.Errorf("clientS2C.ChannelType() = %v, want %v", clientS2C.ChannelType(), "s2c")
+	}
+	if !bytes.Equal(clientS2C.ConnMetadata().SessionID(), clientConnection.SessionID()) {
+		t.Errorf("clientS2C.ConnMetadata().SessionID() = %v, want %v", clientS2C.ConnMetadata().SessionID(), clientConnection.SessionID())
 	}
 	serverS2C := <-serverS2CChan
-	if serverS2C.String() != serverS2C.ChannelID() {
-		t.Errorf("serverS2C.String() = %v, want %v", serverS2C.String(), serverS2C.ChannelID())
+	if serverS2C.String() != "s2c" {
+		t.Errorf("serverS2C.String() = %v, want %v", serverS2C.String(), "s2c")
 	}
 	if serverS2C.ChannelID() != clientS2C.ChannelID() {
 		t.Fatalf("serverS2C.ChannelID() = %v, want %v", serverS2C.ChannelID(), clientS2C.ChannelID())
+	}
+	if serverS2C.ChannelType() != "s2c" {
+		t.Errorf("serverS2C.ChannelType() = %v, want %v", serverS2C.ChannelType(), "s2c")
+	}
+	if !bytes.Equal(serverS2C.ConnMetadata().SessionID(), clientConnection.SessionID()) {
+		t.Errorf("serverS2C.ConnMetadata().SessionID() = %v, want %v", serverS2C.ConnMetadata().SessionID(), clientConnection.SessionID())
 	}
 
 	go func() {
