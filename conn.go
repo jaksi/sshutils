@@ -1,33 +1,15 @@
 package sshutils
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 
 	"golang.org/x/crypto/ssh"
 )
 
-type side int
-
-const (
-	client side = iota
-	server
-)
-
-func (s side) String() string {
-	switch s {
-	case client:
-		return "client"
-	case server:
-		return "server"
-	default:
-		return "unknown"
-	}
-}
-
 type Conn struct {
 	ssh.Conn
-	s             side
 	NewChannels   <-chan *NewChannel
 	Requests      <-chan *ssh.Request
 	nextChannelID int
@@ -44,7 +26,7 @@ func (conn *Conn) NewChannel(name string, data []byte) (*Channel, error) {
 }
 
 func (conn *Conn) String() string {
-	return fmt.Sprintf("%s %s - %s", conn.s, conn.LocalAddr(), conn.RemoteAddr())
+	return base64.StdEncoding.EncodeToString(conn.SessionID())
 }
 
 type NewChannel struct {
@@ -91,7 +73,7 @@ func (channel *Channel) ChannelType() string {
 }
 
 func (channel *Channel) String() string {
-	return channel.channelType
+	return channel.channelID
 }
 
 func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
@@ -111,7 +93,6 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 	newChannels := make(chan *NewChannel)
 	connection := &Conn{
 		Conn:        sshConn,
-		s:           client,
 		NewChannels: newChannels,
 		Requests:    requests,
 	}
@@ -146,7 +127,6 @@ func Listen(address string, config *ssh.ServerConfig) (<-chan *Conn, error) {
 			newChannels := make(chan *NewChannel)
 			connection := &Conn{
 				Conn:        sshConn,
-				s:           server,
 				NewChannels: newChannels,
 				Requests:    requests,
 			}
