@@ -2,7 +2,7 @@ package sshutils_test
 
 import (
 	"bytes"
-	"regexp"
+	"encoding/base64"
 	"testing"
 
 	"github.com/jaksi/sshutils"
@@ -31,17 +31,17 @@ func TestConn(t *testing.T) {
 	}
 	defer clientConnection.Close()
 
-	expectedString := regexp.MustCompile(`^client 127\.0\.0\.1:\d+ - 127\.0\.0\.1:2022$`)
-	if !expectedString.MatchString(clientConnection.String()) {
-		t.Errorf("clientConnection.String() = %v, want match for %v", clientConnection.String(), expectedString)
+	expectedString := base64.StdEncoding.EncodeToString(clientConnection.SessionID())
+	if clientConnection.String() != expectedString {
+		t.Errorf("clientConnection.String() = %v, want %v", clientConnection.String(), expectedString)
 	}
 
 	serverConnection := <-serverConnections
 	defer serverConnection.Close()
 
-	expectedString = regexp.MustCompile(`^server 127\.0\.0\.1:2022 - 127\.0\.0\.1:\d+$`)
-	if !expectedString.MatchString(serverConnection.String()) {
-		t.Errorf("serverConnection.String() = %v, want match for %v", serverConnection.String(), expectedString)
+	expectedString = base64.StdEncoding.EncodeToString(serverConnection.SessionID())
+	if serverConnection.String() != expectedString {
+		t.Errorf("serverConnection.String() = %v, want %v", serverConnection.String(), expectedString)
 	}
 
 	clientC2SChan := make(chan *sshutils.Channel)
@@ -69,8 +69,8 @@ func TestConn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if serverC2S.String() != "c2s" {
-		t.Errorf("serverC2S.String() = %v, want %v", serverC2S.String(), "c2s")
+	if serverC2S.String() != "0" {
+		t.Errorf("serverC2S.String() = %v, want %v", serverC2S.String(), "0")
 	}
 	if serverC2S.ChannelType() != "c2s" {
 		t.Errorf("serverC2S.ChannelType() = %v, want %v", serverC2S.ChannelType(), "c2s")
@@ -79,8 +79,8 @@ func TestConn(t *testing.T) {
 		t.Errorf("serverC2S.ConnMetadata().SessionID() = %v, want %v", serverC2S.ConnMetadata().SessionID(), serverConnection.SessionID())
 	}
 	clientC2S := <-clientC2SChan
-	if clientC2S.String() != "c2s" {
-		t.Errorf("clientC2S.String() = %v, want %v", clientC2S.String(), "c2s")
+	if clientC2S.String() != "0" {
+		t.Errorf("clientC2S.String() = %v, want %v", clientC2S.String(), "0")
 	}
 	if clientC2S.ChannelID() != serverC2S.ChannelID() {
 		t.Fatalf("clientC2S.ChannelID() = %v, want %v", clientC2S.ChannelID(), serverC2S.ChannelID())
@@ -133,8 +133,8 @@ func TestConn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if clientS2C.String() != "s2c" {
-		t.Errorf("clientS2C.String() = %v, want %v", clientS2C.String(), "s2c")
+	if clientS2C.String() != "1" {
+		t.Errorf("clientS2C.String() = %v, want %v", clientS2C.String(), "1")
 	}
 	if clientS2C.ChannelType() != "s2c" {
 		t.Errorf("clientS2C.ChannelType() = %v, want %v", clientS2C.ChannelType(), "s2c")
@@ -143,8 +143,8 @@ func TestConn(t *testing.T) {
 		t.Errorf("clientS2C.ConnMetadata().SessionID() = %v, want %v", clientS2C.ConnMetadata().SessionID(), clientConnection.SessionID())
 	}
 	serverS2C := <-serverS2CChan
-	if serverS2C.String() != "s2c" {
-		t.Errorf("serverS2C.String() = %v, want %v", serverS2C.String(), "s2c")
+	if serverS2C.String() != "1" {
+		t.Errorf("serverS2C.String() = %v, want %v", serverS2C.String(), "1")
 	}
 	if serverS2C.ChannelID() != clientS2C.ChannelID() {
 		t.Fatalf("serverS2C.ChannelID() = %v, want %v", serverS2C.ChannelID(), clientS2C.ChannelID())
