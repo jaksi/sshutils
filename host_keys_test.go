@@ -236,7 +236,7 @@ func TestLoadHostKey(t *testing.T) {
 		{nil, "", true},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			hostKeyFile := filepath.Join(t.TempDir(), "hostkey")
+			hostKeyFile := filepath.Join(t.TempDir(), fmt.Sprint("hostkey_", i))
 			if testCase.input != nil {
 				if err := ioutil.WriteFile(hostKeyFile, testCase.input, 0600); err != nil {
 					t.Fatal(err)
