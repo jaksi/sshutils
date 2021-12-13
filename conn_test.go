@@ -3,6 +3,7 @@ package sshutils_test
 import (
 	"bytes"
 	"encoding/base64"
+	"sync"
 	"testing"
 
 	"github.com/jaksi/sshutils"
@@ -25,8 +26,11 @@ func TestConn(t *testing.T) {
 	}
 	var serverConnection *sshutils.Conn
 	var serverConnectionErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		serverConnection, serverConnectionErr = listener.Accept()
+		wg.Done()
 	}()
 	clientConnection, err := sshutils.Dial("127.0.0.1:2022", &ssh.ClientConfig{
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
@@ -41,6 +45,7 @@ func TestConn(t *testing.T) {
 		t.Errorf("clientConnection.String() = %v, want %v", clientConnection.String(), expectedString)
 	}
 
+	wg.Wait()
 	if serverConnectionErr != nil {
 		t.Fatal(err)
 	}
@@ -195,14 +200,17 @@ func TestConn(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	wg.Add(1)
 	go func() {
 		serverConnection, serverConnectionErr = listener.Accept()
+		wg.Done()
 	}()
 	if _, err := sshutils.Dial("127.0.0.1:2022", &ssh.ClientConfig{
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}); err == nil {
 		t.Error("Dial() should fail")
 	}
+	wg.Wait()
 	if serverConnectionErr == nil {
 		t.Error("listener.Accept() should fail")
 	}
