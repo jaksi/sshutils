@@ -105,39 +105,40 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 	return connection, nil
 }
 
-func Listen(address string, config *ssh.ServerConfig) (<-chan *Conn, error) {
-	listener, err := net.Listen("tcp", address)
+type Listener struct {
+	net.Listener
+	config ssh.ServerConfig
+}
+
+func (listener *Listener) Accept() (*Conn, error) {
+	conn, err := listener.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	connections := make(chan *Conn)
+	sshConn, sshNewChannels, requests, err := ssh.NewServerConn(conn, &listener.config)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	newChannels := make(chan *NewChannel)
+	connection := &Conn{
+		Conn:        sshConn,
+		NewChannels: newChannels,
+		Requests:    requests,
+	}
 	go func() {
-		defer close(connections)
-		defer listener.Close()
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			sshConn, sshNewChannels, requests, err := ssh.NewServerConn(conn, config)
-			if err != nil {
-				conn.Close()
-				continue
-			}
-			newChannels := make(chan *NewChannel)
-			connection := &Conn{
-				Conn:        sshConn,
-				NewChannels: newChannels,
-				Requests:    requests,
-			}
-			go func() {
-				defer close(newChannels)
-				for sshNewChannel := range sshNewChannels {
-					newChannels <- &NewChannel{sshNewChannel, connection}
-				}
-			}()
-			connections <- connection
+		defer close(newChannels)
+		for sshNewChannel := range sshNewChannels {
+			newChannels <- &NewChannel{sshNewChannel, connection}
 		}
 	}()
-	return connections, nil
+	return connection, nil
+}
+
+func Listen(address string, config *ssh.ServerConfig) (*Listener, error) {
+	l, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	return &Listener{l, *config}, nil
 }
