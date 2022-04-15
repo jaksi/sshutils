@@ -154,7 +154,7 @@ func init() {
 		panic(err)
 	}
 	dsaHostKeyFile := filepath.Join(os.TempDir(), "dsa_host_key")
-	if err := ioutil.WriteFile(dsaHostKeyFile, []byte(dsaPrivateKey), 0600); err != nil {
+	if err := ioutil.WriteFile(dsaHostKeyFile, []byte(dsaPrivateKey), 0o600); err != nil {
 		panic(err)
 	}
 	defer os.Remove(dsaHostKeyFile)
@@ -242,7 +242,7 @@ func TestLoadHostKey(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			hostKeyFile := filepath.Join(t.TempDir(), fmt.Sprint("hostkey_", i))
 			if testCase.input != nil {
-				if err := ioutil.WriteFile(hostKeyFile, testCase.input, 0600); err != nil {
+				if err := ioutil.WriteFile(hostKeyFile, testCase.input, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}

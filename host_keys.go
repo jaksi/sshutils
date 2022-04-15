@@ -57,9 +57,7 @@ func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	}, nil
 }
 
-var (
-	UnsupportedKeyType = errors.New("unsupported key type")
-)
+var UnsupportedKeyType = errors.New("unsupported key type")
 
 func GenerateHostKey(t KeyType) (*HostKey, error) {
 	var key interface{}
@@ -91,7 +89,7 @@ func LoadHostKey(fileName string) (*HostKey, error) {
 }
 
 func (key *HostKey) Save(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return fmt.Errorf("Failed to open key file: %w", err)
 	}
