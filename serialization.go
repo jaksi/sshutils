@@ -42,6 +42,7 @@ func (payload *SessionChannelPayload) Marshal() []byte {
 	return nil
 }
 
+//nolint:maligned
 type DirectTcpipChannelPayload struct {
 	Address           string
 	Port              uint32
@@ -310,6 +311,7 @@ func UnmarshalGlobalRequestPayload(request *ssh.Request) (Payload, error) {
 	return payload, nil
 }
 
+//nolint:maligned
 type X11RequestPayload struct {
 	SingleConnection       bool
 	AuthenticationProtocol string
