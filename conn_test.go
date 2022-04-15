@@ -10,7 +10,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+//nolint:funlen,gocognit,gocyclo,cyclop,maintidx
 func TestConn(t *testing.T) {
+	t.Parallel()
 	serverConfig := &ssh.ServerConfig{
 		NoClientAuth: true,
 	}

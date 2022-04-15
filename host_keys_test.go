@@ -168,7 +168,8 @@ func init() {
 }
 
 func TestKeySignature(t *testing.T) {
-	for i, testCase := range []struct {
+	t.Parallel()
+	testCases := []struct {
 		input          sshutils.KeyType
 		expectedString string
 	}{
@@ -176,9 +177,11 @@ func TestKeySignature(t *testing.T) {
 		{sshutils.ECDSA, "ecdsa"},
 		{sshutils.Ed25519, "ed25519"},
 		{-1, "unknown"},
-	} {
+	}
+	for i, testCase := range testCases {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			if testCase.input.String() != testCase.expectedString {
 				t.Errorf("%v.String() = %v, want %v", testCase.input, testCase.input.String(), testCase.expectedString)
 			}
@@ -187,6 +190,7 @@ func TestKeySignature(t *testing.T) {
 }
 
 func TestGenerateHostKey(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input                 sshutils.KeyType
 		expectedPublicKeyType string
@@ -199,6 +203,7 @@ func TestGenerateHostKey(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			hostKey, err := sshutils.GenerateHostKey(testCase.input)
 			if testCase.expectedError {
 				if err == nil {
@@ -221,6 +226,7 @@ func TestGenerateHostKey(t *testing.T) {
 }
 
 func TestLoadHostKey(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input                 []byte
 		expectedPublicKeyType string
@@ -237,9 +243,9 @@ func TestLoadHostKey(t *testing.T) {
 		{[]byte("invalid"), "", true},
 		{nil, "", true},
 	} {
-		i := i
-		testCase := testCase
+		i, testCase := i, testCase
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
 			hostKeyFile := filepath.Join(t.TempDir(), fmt.Sprint("hostkey_", i))
 			if testCase.input != nil {
 				if err := ioutil.WriteFile(hostKeyFile, testCase.input, 0o600); err != nil {
@@ -264,6 +270,7 @@ func TestLoadHostKey(t *testing.T) {
 }
 
 func TestSaveHostKey(t *testing.T) {
+	t.Parallel()
 	hostKeyDirectory := t.TempDir()
 
 	for i, testCase := range []struct {
@@ -281,6 +288,7 @@ func TestSaveHostKey(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			err := testCase.hostKey.Save(testCase.file)
 			if testCase.expectedError {
 				if err == nil {
