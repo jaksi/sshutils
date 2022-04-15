@@ -57,11 +57,11 @@ func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	}, nil
 }
 
-var UnsupportedKeyType = errors.New("unsupported key type")
+var ErrUnsupportedKeyType = errors.New("unsupported key type")
 
 func GenerateHostKey(t KeyType) (*HostKey, error) {
 	var key interface{}
-	err := UnsupportedKeyType
+	err := ErrUnsupportedKeyType
 	switch t {
 	case RSA:
 		key, err = rsa.GenerateKey(rand.Reader, 2048)

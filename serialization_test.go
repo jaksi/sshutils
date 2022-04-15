@@ -710,7 +710,9 @@ func TestUnmarshalPtyRequestPayload(t *testing.T) {
 
 func TestMarshalPtyRequestPayload(t *testing.T) {
 	output := ptyRequestPayload.Marshal()
-	expectedOutput := append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...)
+	expectedOutput := make([]byte, 0)
+	expectedOutput = append(expectedOutput, ptyRequestPayloadBytes...)
+	expectedOutput = append(expectedOutput, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...)
 	if !bytes.Equal(output, expectedOutput) {
 		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
 	}

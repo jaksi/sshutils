@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	InvalidPayload         = errors.New("invalid payload")
-	UnsupportedPayloadType = errors.New("unsupported type")
-	HostKeyNotFound        = errors.New("host key not found")
-	MissingSignature       = errors.New("missing signature")
+	ErrInvalidPayload         = errors.New("invalid payload")
+	ErrUnsupportedPayloadType = errors.New("unsupported type")
+	ErrHostKeyNotFound        = errors.New("host key not found")
+	ErrMissingSignature       = errors.New("missing signature")
 )
 
 type Payload interface {
@@ -33,7 +33,7 @@ func (payload *SessionChannelPayload) String() string {
 
 func (payload *SessionChannelPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return InvalidPayload
+		return ErrInvalidPayload
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ func UnmarshalNewChannelPayload(newChannel ssh.NewChannel) (Payload, error) {
 	case "direct-tcpip":
 		payload = &DirectTcpipChannelPayload{}
 	default:
-		return nil, UnsupportedPayloadType
+		return nil, ErrUnsupportedPayloadType
 	}
 	if err := payload.Unmarshal(newChannel.ExtraData()); err != nil {
 		return nil, fmt.Errorf("Failed to unmarshal payload: %w", err)
@@ -193,7 +193,7 @@ func (payload *HostkeysProveRequestPayload) Response(hostKeys []*HostKey, sessio
 	responseBytes := make([][]byte, len(payload.Hostkeys))
 	for i, requestKey := range payload.Hostkeys {
 		var signature *ssh.Signature
-		err := HostKeyNotFound
+		err := ErrHostKeyNotFound
 		for _, hostKey := range hostKeys {
 			if bytes.Equal(requestKey.Marshal(), hostKey.PublicKey().Marshal()) {
 				signature, err = hostKey.Sign(rand.Reader, hostkeySignatureData(hostKey.PublicKey(), sessionID))
@@ -214,7 +214,7 @@ func (payload *HostkeysProveRequestPayload) VerifyResponse(response []byte, sess
 		return err
 	}
 	if len(signatureBytes) != len(payload.Hostkeys) {
-		return MissingSignature
+		return ErrMissingSignature
 	}
 	for i, b := range signatureBytes {
 		signature := new(ssh.Signature)
@@ -279,7 +279,7 @@ func (payload *NoMoreSessionsRequestPayload) String() string {
 
 func (payload *NoMoreSessionsRequestPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return InvalidPayload
+		return ErrInvalidPayload
 	}
 	return nil
 }
@@ -302,7 +302,7 @@ func UnmarshalGlobalRequestPayload(request *ssh.Request) (Payload, error) {
 	case "hostkeys-prove-00@openssh.com":
 		payload = &HostkeysProveRequestPayload{}
 	default:
-		return nil, UnsupportedPayloadType
+		return nil, ErrUnsupportedPayloadType
 	}
 	if err := payload.Unmarshal(request.Payload); err != nil {
 		return nil, fmt.Errorf("Failed to unmarshal global request payload: %w", err)
@@ -441,7 +441,7 @@ func (payload *ShellRequestPayload) String() string {
 
 func (payload *ShellRequestPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return InvalidPayload
+		return ErrInvalidPayload
 	}
 	return nil
 }
@@ -549,7 +549,7 @@ func UnmarshalChannelRequestPayload(request *ssh.Request) (Payload, error) {
 	case "exit-status":
 		payload = &ExitStatusRequestPayload{}
 	default:
-		return nil, InvalidPayload
+		return nil, ErrInvalidPayload
 	}
 	if err := payload.Unmarshal(request.Payload); err != nil {
 		return nil, fmt.Errorf("Failed to unmarshal channel request: %w", err)
