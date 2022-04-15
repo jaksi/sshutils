@@ -18,7 +18,7 @@ type Conn struct {
 func (conn *Conn) NewChannel(name string, data []byte) (*Channel, error) {
 	sshChannel, requests, err := conn.Conn.OpenChannel(name, data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to open channel: %w", err)
 	}
 	channel := &Channel{sshChannel, requests, fmt.Sprint(conn.nextChannelID), name, conn}
 	conn.nextChannelID++
@@ -37,7 +37,7 @@ type NewChannel struct {
 func (newChannel *NewChannel) AcceptChannel() (*Channel, error) {
 	sshChannel, requests, err := newChannel.NewChannel.Accept()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to accept channel: %w", err)
 	}
 	channel := &Channel{sshChannel, requests, fmt.Sprint(newChannel.conn.nextChannelID), newChannel.ChannelType(), newChannel.conn}
 	newChannel.conn.nextChannelID++
@@ -83,12 +83,12 @@ func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
 func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to dial: %w", err)
 	}
 	sshConn, sshNewChannels, requests, err := ssh.NewClientConn(conn, address, config)
 	if err != nil {
 		conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("Failed to establish SSH client connection: %w", err)
 	}
 	newChannels := make(chan *NewChannel)
 	connection := &Conn{
@@ -113,12 +113,12 @@ type Listener struct {
 func (listener *Listener) Accept() (*Conn, error) {
 	conn, err := listener.Listener.Accept()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to accept connection: %w", err)
 	}
 	sshConn, sshNewChannels, requests, err := ssh.NewServerConn(conn, &listener.config)
 	if err != nil {
 		conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("Failed to establish SSH server connection: %w", err)
 	}
 	newChannels := make(chan *NewChannel)
 	connection := &Conn{
@@ -138,7 +138,7 @@ func (listener *Listener) Accept() (*Conn, error) {
 func Listen(address string, config *ssh.ServerConfig) (*Listener, error) {
 	l, err := net.Listen("tcp", address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to listen: %w", err)
 	}
 	return &Listener{l, *config}, nil
 }
