@@ -1,0 +1,10 @@
+linters:
+  enable-all: true
+  disable:
+    - exhaustivestruct
+    - wsl
+issues:
+  exclude-rules:
+    - linters:
+        - paralleltest
+      text: "does not use range value in test Run"

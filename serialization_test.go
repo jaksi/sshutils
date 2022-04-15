@@ -149,6 +149,7 @@ func (newChannel *mockNewChannel) String() string {
 }
 
 func TestUnmarshalSessionChannelPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.SessionChannelPayload
@@ -161,6 +162,7 @@ func TestUnmarshalSessionChannelPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.SessionChannelPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -183,6 +185,7 @@ func TestUnmarshalSessionChannelPayload(t *testing.T) {
 }
 
 func TestMarshalSessionChannelPayload(t *testing.T) {
+	t.Parallel()
 	payload := &sshutils.SessionChannelPayload{}
 	output := payload.Marshal()
 	expectedOutput := []byte{}
@@ -192,6 +195,7 @@ func TestMarshalSessionChannelPayload(t *testing.T) {
 }
 
 func TestUnmarshalDirectTcpipChannelPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.DirectTcpipChannelPayload
@@ -205,6 +209,7 @@ func TestUnmarshalDirectTcpipChannelPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.DirectTcpipChannelPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -227,6 +232,7 @@ func TestUnmarshalDirectTcpipChannelPayload(t *testing.T) {
 }
 
 func TestMarshalDirectTcpipChannelPayload(t *testing.T) {
+	t.Parallel()
 	output := directTcpipChannelPayload.Marshal()
 	if !bytes.Equal(output, directTcpipChannelPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, directTcpipChannelPayloadBytes)
@@ -234,6 +240,7 @@ func TestMarshalDirectTcpipChannelPayload(t *testing.T) {
 }
 
 func TestUnmarshalNewChannelPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           ssh.NewChannel
 		expectedPayload sshutils.Payload
@@ -247,6 +254,7 @@ func TestUnmarshalNewChannelPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload, err := sshutils.UnmarshalNewChannelPayload(testCase.input)
 			if testCase.expectedError {
 				if err == nil {
@@ -265,6 +273,7 @@ func TestUnmarshalNewChannelPayload(t *testing.T) {
 }
 
 func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.HostkeysRequestPayload
@@ -281,6 +290,7 @@ func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			var payload sshutils.HostkeysRequestPayload
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -303,6 +313,7 @@ func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
 }
 
 func TestMarshalHostkeysRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input          *sshutils.HostkeysRequestPayload
 		expectedOutput []byte
@@ -313,6 +324,7 @@ func TestMarshalHostkeysRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			output := testCase.input.Marshal()
 			if !bytes.Equal(output, testCase.expectedOutput) {
 				t.Errorf("Marshal() = %v, want %v", output, testCase.expectedOutput)
@@ -322,6 +334,7 @@ func TestMarshalHostkeysRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.HostkeysProveRequestPayload
@@ -338,6 +351,7 @@ func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			var payload sshutils.HostkeysProveRequestPayload
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -360,6 +374,7 @@ func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
 }
 
 func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input          *sshutils.HostkeysProveRequestPayload
 		expectedOutput []byte
@@ -370,6 +385,7 @@ func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			output := testCase.input.Marshal()
 			if !bytes.Equal(output, testCase.expectedOutput) {
 				t.Errorf("Marshal() = %v, want %v", output, testCase.expectedOutput)
@@ -379,6 +395,7 @@ func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
 }
 
 func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		request       *sshutils.HostkeysProveRequestPayload
 		hostKeys      []*sshutils.HostKey
@@ -392,6 +409,7 @@ func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
 			if testCase.expectedError {
 				if err == nil {
@@ -416,6 +434,7 @@ func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
 }
 
 func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		request  *sshutils.HostkeysProveRequestPayload
 		hostKeys []*sshutils.HostKey
@@ -426,6 +445,7 @@ func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
 			if err != nil {
 				t.Fatalf("%v.Response(...) = %v, want nil", testCase.request, err)
@@ -439,6 +459,7 @@ func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
 }
 
 func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		request  *sshutils.HostkeysProveRequestPayload
 		response []byte
@@ -450,6 +471,7 @@ func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			err := testCase.request.VerifyResponse(testCase.response, sessionID)
 			if err == nil {
 				t.Errorf("%v.VerifyResponse(...) = %v, want non-nil", testCase.request, err)
@@ -459,6 +481,7 @@ func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
 }
 
 func TestUnmarshalTcpipForwardRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.TcpipForwardRequestPayload
@@ -472,6 +495,7 @@ func TestUnmarshalTcpipForwardRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.TcpipForwardRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -494,6 +518,7 @@ func TestUnmarshalTcpipForwardRequestPayload(t *testing.T) {
 }
 
 func TestMarshalTcpipForwardRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := tcpipForwardRequestPayload.Marshal()
 	if !bytes.Equal(output, tcpipForwardRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, tcpipForwardRequestPayloadBytes)
@@ -501,6 +526,7 @@ func TestMarshalTcpipForwardRequestPayload(t *testing.T) {
 }
 
 func TestTcpipForwardRequestPayloadResponse(t *testing.T) {
+	t.Parallel()
 	response := tcpipForwardRequestPayload.Response(42)
 	expectedResponse := []byte{0x00, 0x00, 0x00, 0x2a}
 	if !bytes.Equal(response, expectedResponse) {
@@ -509,6 +535,7 @@ func TestTcpipForwardRequestPayloadResponse(t *testing.T) {
 }
 
 func TestUnmarshalCancelTcpipForwardRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.CancelTcpipForwardRequestPayload
@@ -522,6 +549,7 @@ func TestUnmarshalCancelTcpipForwardRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.CancelTcpipForwardRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -544,6 +572,7 @@ func TestUnmarshalCancelTcpipForwardRequestPayload(t *testing.T) {
 }
 
 func TestMarshalCancelTcpipForwardRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := cancelTcpipForwardRequestPayload.Marshal()
 	if !bytes.Equal(output, tcpipForwardRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, tcpipForwardRequestPayloadBytes)
@@ -551,6 +580,7 @@ func TestMarshalCancelTcpipForwardRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.NoMoreSessionsRequestPayload
@@ -563,6 +593,7 @@ func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.NoMoreSessionsRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -585,6 +616,7 @@ func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
 }
 
 func TestMarshalNoMoreSessionsRequestPayload(t *testing.T) {
+	t.Parallel()
 	payload := &sshutils.NoMoreSessionsRequestPayload{}
 	output := payload.Marshal()
 	expectedOutput := []byte{}
@@ -594,6 +626,7 @@ func TestMarshalNoMoreSessionsRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalGlobalRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           *ssh.Request
 		expectedPayload sshutils.Payload
@@ -614,6 +647,7 @@ func TestUnmarshalGlobalRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload, err := sshutils.UnmarshalGlobalRequestPayload(testCase.input)
 			if testCase.expectedError {
 				if err == nil {
@@ -632,6 +666,7 @@ func TestUnmarshalGlobalRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalX11RequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.X11RequestPayload
@@ -645,6 +680,7 @@ func TestUnmarshalX11RequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.X11RequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -667,6 +703,7 @@ func TestUnmarshalX11RequestPayload(t *testing.T) {
 }
 
 func TestMarshalX11RequestPayload(t *testing.T) {
+	t.Parallel()
 	output := x11RequestPayload.Marshal()
 	if !bytes.Equal(output, x11RequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, x11RequestPayloadBytes)
@@ -674,6 +711,7 @@ func TestMarshalX11RequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalPtyRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.PtyRequestPayload
@@ -688,6 +726,7 @@ func TestUnmarshalPtyRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.PtyRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -710,6 +749,7 @@ func TestUnmarshalPtyRequestPayload(t *testing.T) {
 }
 
 func TestMarshalPtyRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := ptyRequestPayload.Marshal()
 	expectedOutput := make([]byte, 0)
 	expectedOutput = append(expectedOutput, ptyRequestPayloadBytes...)
@@ -720,6 +760,7 @@ func TestMarshalPtyRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalEnvRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.EnvRequestPayload
@@ -733,6 +774,7 @@ func TestUnmarshalEnvRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.EnvRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -755,6 +797,7 @@ func TestUnmarshalEnvRequestPayload(t *testing.T) {
 }
 
 func TestMarshalEnvRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := envRequestPayload.Marshal()
 	if !bytes.Equal(output, envRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, envRequestPayloadBytes)
@@ -762,6 +805,7 @@ func TestMarshalEnvRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalShellRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.ShellRequestPayload
@@ -774,6 +818,7 @@ func TestUnmarshalShellRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.ShellRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -796,6 +841,7 @@ func TestUnmarshalShellRequestPayload(t *testing.T) {
 }
 
 func TestMarshalShellRequestPayload(t *testing.T) {
+	t.Parallel()
 	payload := &sshutils.ShellRequestPayload{}
 	output := payload.Marshal()
 	expectedOutput := []byte{}
@@ -805,6 +851,7 @@ func TestMarshalShellRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalExecRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.ExecRequestPayload
@@ -818,6 +865,7 @@ func TestUnmarshalExecRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.ExecRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -840,6 +888,7 @@ func TestUnmarshalExecRequestPayload(t *testing.T) {
 }
 
 func TestMarshalExecRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := execRequestPayload.Marshal()
 	if !bytes.Equal(output, execRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, execRequestPayloadBytes)
@@ -847,6 +896,7 @@ func TestMarshalExecRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalSubsystemRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.SubsystemRequestPayload
@@ -860,6 +910,7 @@ func TestUnmarshalSubsystemRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.SubsystemRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -882,6 +933,7 @@ func TestUnmarshalSubsystemRequestPayload(t *testing.T) {
 }
 
 func TestMarshalSubsystemRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := subsystemRequestPayload.Marshal()
 	if !bytes.Equal(output, subsystemRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, subsystemRequestPayloadBytes)
@@ -889,6 +941,7 @@ func TestMarshalSubsystemRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalWindowChangeRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.WindowChangeRequestPayload
@@ -902,6 +955,7 @@ func TestUnmarshalWindowChangeRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.WindowChangeRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -924,6 +978,7 @@ func TestUnmarshalWindowChangeRequestPayload(t *testing.T) {
 }
 
 func TestMarshalWindowChangeRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := windowChangeRequestPayload.Marshal()
 	if !bytes.Equal(output, windowChangeRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, windowChangeRequestPayloadBytes)
@@ -931,6 +986,7 @@ func TestMarshalWindowChangeRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalExitStatusRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           []byte
 		expectedPayload *sshutils.ExitStatusRequestPayload
@@ -944,6 +1000,7 @@ func TestUnmarshalExitStatusRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload := new(sshutils.ExitStatusRequestPayload)
 			err := payload.Unmarshal(testCase.input)
 			if testCase.expectedError {
@@ -966,6 +1023,7 @@ func TestUnmarshalExitStatusRequestPayload(t *testing.T) {
 }
 
 func TestMarshalExitStatusRequestPayload(t *testing.T) {
+	t.Parallel()
 	output := exitStatusRequestPayload.Marshal()
 	if !bytes.Equal(output, exitStatusRequestPayloadBytes) {
 		t.Errorf("Marshal() = %v, want %v", output, exitStatusRequestPayloadBytes)
@@ -973,6 +1031,7 @@ func TestMarshalExitStatusRequestPayload(t *testing.T) {
 }
 
 func TestUnmarshalChannelRequestPayload(t *testing.T) {
+	t.Parallel()
 	for i, testCase := range []struct {
 		input           *ssh.Request
 		expectedPayload sshutils.Payload
@@ -999,6 +1058,7 @@ func TestUnmarshalChannelRequestPayload(t *testing.T) {
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			payload, err := sshutils.UnmarshalChannelRequestPayload(testCase.input)
 			if testCase.expectedError {
 				if err == nil {
