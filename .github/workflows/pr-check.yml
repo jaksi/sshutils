@@ -8,8 +8,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout
-      - uses: golangci/golangci-lint-action
+      - uses: actions/checkout@v3
+      - uses: golangci/golangci-lint-action@v3
   test:
     name: Test
     strategy:
@@ -20,8 +20,8 @@ jobs:
           - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout
-      - uses: actions/setup-go
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
         with:
           go-version: ^1.16
       - run: go test -race -timeout 1m
