@@ -33,6 +33,7 @@ func TestConn(t *testing.T) {
 		wg.Done()
 	}()
 	clientConnection, err := sshutils.Dial("127.0.0.1:2022", &ssh.ClientConfig{
+		//nolint:gosec
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	})
 	if err != nil {
@@ -189,6 +190,7 @@ func TestConn(t *testing.T) {
 	}
 
 	if _, err := sshutils.Dial("test.invalid:2022", &ssh.ClientConfig{
+		//nolint:gosec
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}); err == nil {
 		t.Error("Dial(test.invalid:2022) should fail")
@@ -206,6 +208,7 @@ func TestConn(t *testing.T) {
 		wg.Done()
 	}()
 	if _, err := sshutils.Dial("127.0.0.1:2022", &ssh.ClientConfig{
+		//nolint:gosec
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}); err == nil {
 		t.Error("Dial() should fail")
