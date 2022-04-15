@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -48,7 +49,7 @@ func (key *HostKey) String() string {
 func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	signer, err := ssh.NewSignerFromKey(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to create signer: %w", err)
 	}
 	return &HostKey{
 		Signer: signer,
@@ -72,7 +73,7 @@ func GenerateHostKey(t KeyType) (*HostKey, error) {
 		_, key, err = ed25519.GenerateKey(rand.Reader)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to generate key: %w", err)
 	}
 	return hostKeyFromKey(key)
 }
@@ -80,11 +81,11 @@ func GenerateHostKey(t KeyType) (*HostKey, error) {
 func LoadHostKey(fileName string) (*HostKey, error) {
 	keyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to read key file: %w", err)
 	}
 	key, err := ssh.ParseRawPrivateKey(keyBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to parse key: %w", err)
 	}
 	return hostKeyFromKey(key)
 }
@@ -92,16 +93,18 @@ func LoadHostKey(fileName string) (*HostKey, error) {
 func (key *HostKey) Save(fileName string) error {
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to open key file: %w", err)
 	}
 	defer file.Close()
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(key.key)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to marshal key: %w", err)
 	}
-	_, err = file.Write(pem.EncodeToMemory(&pem.Block{
+	if _, err = file.Write(pem.EncodeToMemory(&pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: keyBytes,
-	}))
-	return err
+	})); err != nil {
+		return fmt.Errorf("Failed to write key file: %w", err)
+	}
+	return nil
 }

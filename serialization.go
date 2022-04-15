@@ -54,7 +54,10 @@ func (payload *DirectTcpipChannelPayload) String() string {
 }
 
 func (payload *DirectTcpipChannelPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal payload: %w", err)
+	}
+	return nil
 }
 
 func (payload *DirectTcpipChannelPayload) Marshal() []byte {
@@ -72,7 +75,7 @@ func UnmarshalNewChannelPayload(newChannel ssh.NewChannel) (Payload, error) {
 		return nil, UnsupportedPayloadType
 	}
 	if err := payload.Unmarshal(newChannel.ExtraData()); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to unmarshal payload: %w", err)
 	}
 	return payload, nil
 }
@@ -85,7 +88,7 @@ func unmarshalBytes(data []byte) ([][]byte, error) {
 			Rest  []byte `ssh:"rest"`
 		}
 		if err := ssh.Unmarshal(data, &b); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to unmarshal bytes: %w", err)
 		}
 		result = append(result, []byte(b.Bytes))
 		data = b.Rest
@@ -120,7 +123,7 @@ func unmarshalPublicKeys(data []byte) (PublicKeys, error) {
 	for i, b := range publicKeyBytes {
 		publicKeys[i], err = ssh.ParsePublicKey(b)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to parse public key: %w", err)
 		}
 	}
 	return publicKeys, nil
@@ -198,7 +201,7 @@ func (payload *HostkeysProveRequestPayload) Response(hostKeys []*HostKey, sessio
 			}
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to sign hostkey: %w", err)
 		}
 		responseBytes[i] = ssh.Marshal(signature)
 	}
@@ -216,10 +219,10 @@ func (payload *HostkeysProveRequestPayload) VerifyResponse(response []byte, sess
 	for i, b := range signatureBytes {
 		signature := new(ssh.Signature)
 		if err := ssh.Unmarshal(b, signature); err != nil {
-			return err
+			return fmt.Errorf("Failed to unmarshal signature: %w", err)
 		}
 		if err := payload.Hostkeys[i].Verify(hostkeySignatureData(payload.Hostkeys[i], sessionID), signature); err != nil {
-			return err
+			return fmt.Errorf("Failed to verify signature: %w", err)
 		}
 	}
 	return nil
@@ -237,7 +240,10 @@ func (payload *TcpipForwardRequestPayload) String() string {
 }
 
 func (payload *TcpipForwardRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal tcpip-forward request: %w", err)
+	}
+	return nil
 }
 
 func (payload *TcpipForwardRequestPayload) Marshal() []byte {
@@ -255,7 +261,10 @@ func (payload *CancelTcpipForwardRequestPayload) String() string {
 }
 
 func (payload *CancelTcpipForwardRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal cancel-tcpip-forward request: %w", err)
+	}
+	return nil
 }
 
 func (payload *CancelTcpipForwardRequestPayload) Marshal() []byte {
@@ -296,7 +305,7 @@ func UnmarshalGlobalRequestPayload(request *ssh.Request) (Payload, error) {
 		return nil, UnsupportedPayloadType
 	}
 	if err := payload.Unmarshal(request.Payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to unmarshal global request payload: %w", err)
 	}
 	return payload, nil
 }
@@ -313,7 +322,10 @@ func (payload *X11RequestPayload) String() string {
 }
 
 func (payload *X11RequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal x11-req request: %w", err)
+	}
+	return nil
 }
 
 func (payload *X11RequestPayload) Marshal() []byte {
@@ -345,7 +357,7 @@ func (payload *PtyRequestPayload) String() string {
 func (payload *PtyRequestPayload) Unmarshal(data []byte) error {
 	var raw rawPtyRequestPayload
 	if err := ssh.Unmarshal(data, &raw); err != nil {
-		return err
+		return fmt.Errorf("Failed to unmarshal pty-req request: %w", err)
 	}
 	rawTerminalModes := []byte(raw.TerminalModes)
 	terminalModes := ssh.TerminalModes{}
@@ -363,7 +375,7 @@ func (payload *PtyRequestPayload) Unmarshal(data []byte) error {
 			Rest     []byte `ssh:"rest"`
 		}
 		if err := ssh.Unmarshal(opcode.Rest, &argument); err != nil {
-			return err
+			return fmt.Errorf("Failed to unmarshal opcode: %w", err)
 		}
 		terminalModes[opcode.Opcode] = argument.Argument
 		rawTerminalModes = argument.Rest
@@ -411,7 +423,10 @@ func (payload *EnvRequestPayload) String() string {
 }
 
 func (payload *EnvRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal env request: %w", err)
+	}
+	return nil
 }
 
 func (payload *EnvRequestPayload) Marshal() []byte {
@@ -444,7 +459,10 @@ func (payload *ExecRequestPayload) String() string {
 }
 
 func (payload *ExecRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal exec request: %w", err)
+	}
+	return nil
 }
 
 func (payload *ExecRequestPayload) Marshal() []byte {
@@ -460,7 +478,10 @@ func (payload *SubsystemRequestPayload) String() string {
 }
 
 func (payload *SubsystemRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal subsystem request: %w", err)
+	}
+	return nil
 }
 
 func (payload *SubsystemRequestPayload) Marshal() []byte {
@@ -479,7 +500,10 @@ func (payload *WindowChangeRequestPayload) String() string {
 }
 
 func (payload *WindowChangeRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal window-change request: %w", err)
+	}
+	return nil
 }
 
 func (payload *WindowChangeRequestPayload) Marshal() []byte {
@@ -495,7 +519,10 @@ func (payload *ExitStatusRequestPayload) String() string {
 }
 
 func (payload *ExitStatusRequestPayload) Unmarshal(data []byte) error {
-	return ssh.Unmarshal(data, payload)
+	if err := ssh.Unmarshal(data, payload); err != nil {
+		return fmt.Errorf("Failed to unmarshal exit-status request: %w", err)
+	}
+	return nil
 }
 
 func (payload *ExitStatusRequestPayload) Marshal() []byte {
@@ -525,7 +552,7 @@ func UnmarshalChannelRequestPayload(request *ssh.Request) (Payload, error) {
 		return nil, InvalidPayload
 	}
 	if err := payload.Unmarshal(request.Payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to unmarshal channel request: %w", err)
 	}
 	return payload, nil
 }

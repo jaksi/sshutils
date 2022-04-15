@@ -126,7 +126,7 @@ type mockNewChannel struct {
 
 func (newChannel *mockNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, error) {
 	if !newChannel.canAccept {
-		return nil, nil, fmt.Errorf("mockNewChannel: cannot accept")
+		return nil, nil, fmt.Errorf("mockNewChannel: cannot accept") //nolint:goerr113
 	}
 	return nil, nil, nil
 }
