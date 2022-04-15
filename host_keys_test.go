@@ -177,6 +177,7 @@ func TestKeySignature(t *testing.T) {
 		{sshutils.Ed25519, "ed25519"},
 		{-1, "unknown"},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			if testCase.input.String() != testCase.expectedString {
 				t.Errorf("%v.String() = %v, want %v", testCase.input, testCase.input.String(), testCase.expectedString)
@@ -196,6 +197,7 @@ func TestGenerateHostKey(t *testing.T) {
 		{sshutils.Ed25519, "ssh-ed25519", false},
 		{-1, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			hostKey, err := sshutils.GenerateHostKey(testCase.input)
 			if testCase.expectedError {
@@ -235,6 +237,8 @@ func TestLoadHostKey(t *testing.T) {
 		{[]byte("invalid"), "", true},
 		{nil, "", true},
 	} {
+		i := i
+		testCase := testCase
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			hostKeyFile := filepath.Join(t.TempDir(), fmt.Sprint("hostkey_", i))
 			if testCase.input != nil {
@@ -275,6 +279,7 @@ func TestSaveHostKey(t *testing.T) {
 		{rsaHostKey, filepath.Join(hostKeyDirectory, "rsa"), true},
 		{rsaHostKey, hostKeyDirectory, true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			err := testCase.hostKey.Save(testCase.file)
 			if testCase.expectedError {

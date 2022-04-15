@@ -158,6 +158,7 @@ func TestUnmarshalSessionChannelPayload(t *testing.T) {
 		{[]byte{}, &sshutils.SessionChannelPayload{}, "session", false},
 		{[]byte{42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.SessionChannelPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -201,6 +202,7 @@ func TestUnmarshalDirectTcpipChannelPayload(t *testing.T) {
 		{[]byte{}, nil, "", true},
 		{[]byte{42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.DirectTcpipChannelPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -242,6 +244,7 @@ func TestUnmarshalNewChannelPayload(t *testing.T) {
 		{&mockNewChannel{"direct-tcpip", nil, true}, nil, true},
 		{&mockNewChannel{"test", nil, true}, nil, true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload, err := sshutils.UnmarshalNewChannelPayload(testCase.input)
 			if testCase.expectedError {
@@ -275,6 +278,7 @@ func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
 		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			var payload sshutils.HostkeysRequestPayload
 			err := payload.Unmarshal(testCase.input)
@@ -306,6 +310,7 @@ func TestMarshalHostkeysRequestPayload(t *testing.T) {
 		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
 		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...)},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			output := testCase.input.Marshal()
 			if !bytes.Equal(output, testCase.expectedOutput) {
@@ -330,6 +335,7 @@ func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
 		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			var payload sshutils.HostkeysProveRequestPayload
 			err := payload.Unmarshal(testCase.input)
@@ -361,6 +367,7 @@ func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...)},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			output := testCase.input.Marshal()
 			if !bytes.Equal(output, testCase.expectedOutput) {
@@ -382,6 +389,7 @@ func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{}, true},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{ed25519HostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
 			if testCase.expectedError {
@@ -415,6 +423,7 @@ func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
 			if err != nil {
@@ -438,6 +447,7 @@ func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []byte{0x00, 0x00, 0x00, 0x00}},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, ssh.Marshal(struct{ string }{string(ssh.Marshal(ssh.Signature{}))})},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			err := testCase.request.VerifyResponse(testCase.response, sessionID)
 			if err == nil {
@@ -459,6 +469,7 @@ func TestUnmarshalTcpipForwardRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{tcpipForwardRequestPayloadBytes, tcpipForwardRequestPayload, "tcpip-forward: example.org:443", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.TcpipForwardRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -508,6 +519,7 @@ func TestUnmarshalCancelTcpipForwardRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{tcpipForwardRequestPayloadBytes, cancelTcpipForwardRequestPayload, "cancel-tcpip-forward: example.org:443", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.CancelTcpipForwardRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -548,6 +560,7 @@ func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
 		{[]byte{}, &sshutils.NoMoreSessionsRequestPayload{}, "no-more-sessions", false},
 		{[]byte{0x42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.NoMoreSessionsRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -598,6 +611,7 @@ func TestUnmarshalGlobalRequestPayload(t *testing.T) {
 		{&ssh.Request{Type: "foo"}, nil, true},
 		{&ssh.Request{Type: "shell"}, nil, true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload, err := sshutils.UnmarshalGlobalRequestPayload(testCase.input)
 			if testCase.expectedError {
@@ -628,6 +642,7 @@ func TestUnmarshalX11RequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{x11RequestPayloadBytes, x11RequestPayload, "x11-req: 0", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.X11RequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -670,6 +685,7 @@ func TestUnmarshalPtyRequestPayload(t *testing.T) {
 		{append(ptyRequestPayloadBytes, []byte{0x00, 0x00, 0x00, 0x01, 0x42}...), nil, "", true},
 		{append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...), ptyRequestPayload, "pty-req: xterm, 80x24", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.PtyRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -712,6 +728,7 @@ func TestUnmarshalEnvRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{envRequestPayloadBytes, envRequestPayload, "env: foo=bar", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.EnvRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -752,6 +769,7 @@ func TestUnmarshalShellRequestPayload(t *testing.T) {
 		{[]byte{}, &sshutils.ShellRequestPayload{}, "shell", false},
 		{[]byte{0x42}, nil, "", true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.ShellRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -795,6 +813,7 @@ func TestUnmarshalExecRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{execRequestPayloadBytes, execRequestPayload, "exec: /bin/sh", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.ExecRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -836,6 +855,7 @@ func TestUnmarshalSubsystemRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{subsystemRequestPayloadBytes, subsystemRequestPayload, "subsystem: sftp", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.SubsystemRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -877,6 +897,7 @@ func TestUnmarshalWindowChangeRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{windowChangeRequestPayloadBytes, windowChangeRequestPayload, "window-change: 120x80", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.WindowChangeRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -918,6 +939,7 @@ func TestUnmarshalExitStatusRequestPayload(t *testing.T) {
 		{[]byte{0x42}, nil, "", true},
 		{exitStatusRequestPayloadBytes, exitStatusRequestPayload, "exit-status: 1", false},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload := new(sshutils.ExitStatusRequestPayload)
 			err := payload.Unmarshal(testCase.input)
@@ -972,6 +994,7 @@ func TestUnmarshalChannelRequestPayload(t *testing.T) {
 		{&ssh.Request{Type: "foo"}, nil, true},
 		{&ssh.Request{Type: "no-more-sessions@openssh.com"}, nil, true},
 	} {
+		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			payload, err := sshutils.UnmarshalChannelRequestPayload(testCase.input)
 			if testCase.expectedError {
