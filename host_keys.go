@@ -16,6 +16,11 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	rsaKeyBitSize    = 2048
+	hostKeyFilePerms = 0o600
+)
+
 type KeyType int
 
 const (
@@ -64,7 +69,7 @@ func GenerateHostKey(t KeyType) (*HostKey, error) {
 	err := ErrUnsupportedKeyType
 	switch t {
 	case RSA:
-		key, err = rsa.GenerateKey(rand.Reader, 2048)
+		key, err = rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
 	case ECDSA:
 		key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	case Ed25519:
@@ -89,7 +94,7 @@ func LoadHostKey(fileName string) (*HostKey, error) {
 }
 
 func (key *HostKey) Save(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, hostKeyFilePerms)
 	if err != nil {
 		return fmt.Errorf("Failed to open key file: %w", err)
 	}

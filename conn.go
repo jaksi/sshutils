@@ -39,7 +39,10 @@ func (newChannel *NewChannel) AcceptChannel() (*Channel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to accept channel: %w", err)
 	}
-	channel := &Channel{sshChannel, requests, fmt.Sprint(newChannel.conn.nextChannelID), newChannel.ChannelType(), newChannel.conn}
+	channel := &Channel{
+		sshChannel, requests,
+		fmt.Sprint(newChannel.conn.nextChannelID), newChannel.ChannelType(), newChannel.conn,
+	}
 	newChannel.conn.nextChannelID++
 	return channel, nil
 }
