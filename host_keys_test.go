@@ -214,7 +214,8 @@ func TestGenerateHostKey(t *testing.T) {
 					t.Fatalf("GenerateHostKey(%v) = %v, want nil", testCase.input, err)
 				}
 				if hostKey.PublicKey().Type() != testCase.expectedPublicKeyType {
-					t.Errorf("GenerateHostKey(%v).PublicKey().Type() = %v, want %v", testCase, hostKey.PublicKey().Type(), testCase.expectedPublicKeyType)
+					t.Errorf("GenerateHostKey(%v).PublicKey().Type() = %v, want %v",
+						testCase, hostKey.PublicKey().Type(), testCase.expectedPublicKeyType)
 				}
 				expectedPrefix := "SHA256:"
 				if !strings.HasPrefix(hostKey.String(), expectedPrefix) {
@@ -262,7 +263,8 @@ func TestLoadHostKey(t *testing.T) {
 					t.Fatalf("LoadHostKey(...) = %v, want nil", err)
 				}
 				if hostKey.PublicKey().Type() != testCase.expectedPublicKeyType {
-					t.Errorf("LoadHostKey(...).PublicKey().Type() = %v, want %v", hostKey.PublicKey().Type(), testCase.expectedPublicKeyType)
+					t.Errorf("LoadHostKey(...).PublicKey().Type() = %v, want %v",
+						hostKey.PublicKey().Type(), testCase.expectedPublicKeyType)
 				}
 			}
 		})

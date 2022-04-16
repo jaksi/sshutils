@@ -126,7 +126,6 @@ type mockNewChannel struct {
 
 func (newChannel *mockNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, error) {
 	if !newChannel.canAccept {
-		//nolint:goerr113
 		return nil, nil, fmt.Errorf("mockNewChannel: cannot accept")
 	}
 	return nil, nil, nil
@@ -187,9 +186,7 @@ func TestUnmarshalSessionChannelPayload(t *testing.T) {
 func TestMarshalSessionChannelPayload(t *testing.T) {
 	t.Parallel()
 	payload := &sshutils.SessionChannelPayload{}
-	output := payload.Marshal()
-	expectedOutput := []byte{}
-	if !bytes.Equal(output, expectedOutput) {
+	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
 		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
 	}
 }
@@ -282,8 +279,19 @@ func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
 	}{
 		{nil, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, "hostkeys: []", false},
 		{[]byte{}, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, "hostkeys: []", false},
-		{rsaHostkeyRequestPayloadBytes, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, fmt.Sprintf("hostkeys: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())), false},
-		{append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...), &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, fmt.Sprintf("hostkeys: [%v, %v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())), false},
+		{
+			rsaHostkeyRequestPayloadBytes,
+			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			fmt.Sprintf("hostkeys: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())),
+			false,
+		},
+		{
+			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
+			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			fmt.Sprintf("hostkeys: [%v, %v]",
+				ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())),
+			false,
+		},
 		{[]byte{0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
@@ -320,7 +328,10 @@ func TestMarshalHostkeysRequestPayload(t *testing.T) {
 	}{
 		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, []byte{}},
 		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
-		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...)},
+		{
+			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -343,8 +354,19 @@ func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
 	}{
 		{nil, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, "hostkeys_prove: []", false},
 		{[]byte{}, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, "hostkeys_prove: []", false},
-		{rsaHostkeyRequestPayloadBytes, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, fmt.Sprintf("hostkeys_prove: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())), false},
-		{append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...), &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, fmt.Sprintf("hostkeys_prove: [%v, %v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())), false},
+		{
+			rsaHostkeyRequestPayloadBytes,
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			fmt.Sprintf("hostkeys_prove: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())),
+			false,
+		},
+		{
+			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			fmt.Sprintf("hostkeys_prove: [%v, %v]",
+				ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())),
+			false,
+		},
 		{[]byte{0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
 		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
@@ -381,7 +403,10 @@ func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
 	}{
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []byte{}},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...)},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -402,10 +427,22 @@ func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
 		expectedError bool
 	}{
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, false},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, false},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, false},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
+			false,
+		},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
+			false,
+		},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{}, true},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{ed25519HostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, true},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{ed25519HostKey.PublicKey()}},
+			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
+			true,
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -440,8 +477,14 @@ func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
 		hostKeys []*sshutils.HostKey
 	}{
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
+		},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
+			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -467,7 +510,10 @@ func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []byte{0x42}},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []byte{}},
 		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []byte{0x00, 0x00, 0x00, 0x00}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, ssh.Marshal(struct{ string }{string(ssh.Marshal(ssh.Signature{}))})},
+		{
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			ssh.Marshal(struct{ string }{string(ssh.Marshal(ssh.Signature{}))}),
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -618,9 +664,7 @@ func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
 func TestMarshalNoMoreSessionsRequestPayload(t *testing.T) {
 	t.Parallel()
 	payload := &sshutils.NoMoreSessionsRequestPayload{}
-	output := payload.Marshal()
-	expectedOutput := []byte{}
-	if !bytes.Equal(output, expectedOutput) {
+	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
 		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
 	}
 }
@@ -635,13 +679,25 @@ func TestUnmarshalGlobalRequestPayload(t *testing.T) {
 		{&ssh.Request{Type: "tcpip-forward"}, nil, true},
 		{&ssh.Request{Type: "tcpip-forward", Payload: tcpipForwardRequestPayloadBytes}, tcpipForwardRequestPayload, false},
 		{&ssh.Request{Type: "cancel-tcpip-forward"}, nil, true},
-		{&ssh.Request{Type: "cancel-tcpip-forward", Payload: tcpipForwardRequestPayloadBytes}, cancelTcpipForwardRequestPayload, false},
+		{
+			&ssh.Request{Type: "cancel-tcpip-forward", Payload: tcpipForwardRequestPayloadBytes},
+			cancelTcpipForwardRequestPayload,
+			false,
+		},
 		{&ssh.Request{Type: "no-more-sessions@openssh.com", Payload: []byte{0x42}}, nil, true},
 		{&ssh.Request{Type: "no-more-sessions@openssh.com"}, &sshutils.NoMoreSessionsRequestPayload{}, false},
 		{&ssh.Request{Type: "hostkeys-00@openssh.com", Payload: []byte{0x42}}, nil, true},
-		{&ssh.Request{Type: "hostkeys-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes}, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, false},
+		{
+			&ssh.Request{Type: "hostkeys-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes},
+			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			false,
+		},
 		{&ssh.Request{Type: "hostkeys-prove-00@openssh.com", Payload: []byte{0x42}}, nil, true},
-		{&ssh.Request{Type: "hostkeys-prove-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes}, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, false},
+		{
+			&ssh.Request{Type: "hostkeys-prove-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes},
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
+			false,
+		},
 		{&ssh.Request{Type: "foo"}, nil, true},
 		{&ssh.Request{Type: "shell"}, nil, true},
 	} {
@@ -722,7 +778,10 @@ func TestUnmarshalPtyRequestPayload(t *testing.T) {
 		{[]byte{}, nil, "", true},
 		{[]byte{0x42}, nil, "", true},
 		{append(ptyRequestPayloadBytes, []byte{0x00, 0x00, 0x00, 0x01, 0x42}...), nil, "", true},
-		{append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...), ptyRequestPayload, "pty-req: xterm, 80x24", false},
+		{
+			append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...),
+			ptyRequestPayload, "pty-req: xterm, 80x24", false,
+		},
 	} {
 		testCase := testCase
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -843,9 +902,7 @@ func TestUnmarshalShellRequestPayload(t *testing.T) {
 func TestMarshalShellRequestPayload(t *testing.T) {
 	t.Parallel()
 	payload := &sshutils.ShellRequestPayload{}
-	output := payload.Marshal()
-	expectedOutput := []byte{}
-	if !bytes.Equal(output, expectedOutput) {
+	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
 		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
 	}
 }
@@ -1040,7 +1097,13 @@ func TestUnmarshalChannelRequestPayload(t *testing.T) {
 		{&ssh.Request{Type: "x11-req"}, nil, true},
 		{&ssh.Request{Type: "x11-req", Payload: x11RequestPayloadBytes}, x11RequestPayload, false},
 		{&ssh.Request{Type: "pty-req"}, nil, true},
-		{&ssh.Request{Type: "pty-req", Payload: append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...)}, ptyRequestPayload, false},
+		{
+			&ssh.Request{
+				Type:    "pty-req",
+				Payload: append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...),
+			},
+			ptyRequestPayload, false,
+		},
 		{&ssh.Request{Type: "env"}, nil, true},
 		{&ssh.Request{Type: "env", Payload: envRequestPayloadBytes}, envRequestPayload, false},
 		{&ssh.Request{Type: "shell", Payload: []byte{0x42}}, nil, true},

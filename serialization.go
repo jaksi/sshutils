@@ -51,7 +51,9 @@ type DirectTcpipChannelPayload struct {
 }
 
 func (payload *DirectTcpipChannelPayload) String() string {
-	return fmt.Sprintf("direct-tcpip: %v -> %v", net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)), net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
+	return fmt.Sprintf("direct-tcpip: %v -> %v",
+		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)),
+		net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
 }
 
 func (payload *DirectTcpipChannelPayload) Unmarshal(data []byte) error {
@@ -531,6 +533,7 @@ func (payload *ExitStatusRequestPayload) Marshal() []byte {
 	return ssh.Marshal(payload)
 }
 
+//nolint:cyclop
 func UnmarshalChannelRequestPayload(request *ssh.Request) (Payload, error) {
 	var payload Payload
 	switch request.Type {

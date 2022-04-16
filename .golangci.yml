@@ -3,8 +3,24 @@ linters:
   disable:
     - exhaustivestruct
     - wsl
+    - ireturn
+    - nlreturn
+    - varnamelen
 issues:
   exclude-rules:
     - linters:
         - paralleltest
       text: "does not use range value in test Run"
+    - path: _test\.go
+      linters:
+        - nestif
+        - dupl
+        - gosec
+        - funlen
+        - gocognit
+        - gocyclo
+        - cyclop
+        - maintidx
+        - gochecknoglobals
+        - gochecknoinits
+        - goerr113
