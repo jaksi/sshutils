@@ -274,6 +274,9 @@ func TestLoadHostKey(t *testing.T) {
 func TestSaveHostKey(t *testing.T) {
 	t.Parallel()
 	hostKeyDirectory := t.TempDir()
+	if err := ioutil.WriteFile(filepath.Join(hostKeyDirectory, "already_exists"), []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	for i, testCase := range []struct {
 		hostKey       *sshutils.HostKey
@@ -285,7 +288,7 @@ func TestSaveHostKey(t *testing.T) {
 		{ed25519HostKey, filepath.Join(hostKeyDirectory, "ed25519"), false},
 		{rsaHostKey, filepath.Join(hostKeyDirectory, "keys", "rsa"), true},
 		{dsaHostKey, filepath.Join(hostKeyDirectory, "dsa"), true},
-		{rsaHostKey, filepath.Join(hostKeyDirectory, "rsa"), true},
+		{rsaHostKey, filepath.Join(hostKeyDirectory, "already_exists"), true},
 		{rsaHostKey, hostKeyDirectory, true},
 	} {
 		testCase := testCase
