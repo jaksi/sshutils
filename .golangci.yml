@@ -24,3 +24,4 @@ issues:
         - gochecknoglobals
         - gochecknoinits
         - goerr113
+        - nilnil

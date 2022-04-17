@@ -29,6 +29,14 @@ func (conn *Conn) String() string {
 	return base64.StdEncoding.EncodeToString(conn.SessionID())
 }
 
+func (conn *Conn) Request(name string, wantReply bool, payload Payload) (bool, []byte, error) {
+	accepted, reply, err := conn.SendRequest(name, wantReply, payload.Marshal())
+	if err != nil {
+		return false, nil, fmt.Errorf("Failed to send request: %w", err)
+	}
+	return accepted, reply, nil
+}
+
 type NewChannel struct {
 	ssh.NewChannel
 	conn *Conn
@@ -81,6 +89,14 @@ func (channel *Channel) String() string {
 
 func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
 	return channel.conn
+}
+
+func (channel *Channel) Request(name string, wantReply bool, payload Payload) (bool, error) {
+	accepted, err := channel.SendRequest(name, wantReply, payload.Marshal())
+	if err != nil {
+		return false, fmt.Errorf("Failed to send request: %w", err)
+	}
+	return accepted, nil
 }
 
 func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
