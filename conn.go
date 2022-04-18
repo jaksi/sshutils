@@ -15,7 +15,11 @@ type Conn struct {
 	nextChannelID int
 }
 
-func (conn *Conn) NewChannel(name string, data []byte) (*Channel, error) {
+func (conn *Conn) NewChannel(name string, payload Payload) (*Channel, error) {
+	var data []byte
+	if payload != nil {
+		data = payload.Marshal()
+	}
 	sshChannel, requests, err := conn.Conn.OpenChannel(name, data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open channel: %w", err)
@@ -30,7 +34,11 @@ func (conn *Conn) String() string {
 }
 
 func (conn *Conn) Request(name string, wantReply bool, payload Payload) (bool, []byte, error) {
-	accepted, reply, err := conn.SendRequest(name, wantReply, payload.Marshal())
+	var data []byte
+	if payload != nil {
+		data = payload.Marshal()
+	}
+	accepted, reply, err := conn.SendRequest(name, wantReply, data)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to send request: %w", err)
 	}
@@ -92,7 +100,11 @@ func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
 }
 
 func (channel *Channel) Request(name string, wantReply bool, payload Payload) (bool, error) {
-	accepted, err := channel.SendRequest(name, wantReply, payload.Marshal())
+	var data []byte
+	if payload != nil {
+		data = payload.Marshal()
+	}
+	accepted, err := channel.SendRequest(name, wantReply, data)
 	if err != nil {
 		return false, fmt.Errorf("Failed to send request: %w", err)
 	}
