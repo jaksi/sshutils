@@ -111,16 +111,7 @@ func (channel *Channel) Request(name string, wantReply bool, payload Payload) (b
 	return accepted, nil
 }
 
-func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to dial: %w", err)
-	}
-	sshConn, sshNewChannels, sshRequests, err := ssh.NewClientConn(conn, address, config)
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("Failed to establish SSH client connection: %w", err)
-	}
+func handleConn(sshConn ssh.Conn, sshNewChannels <-chan ssh.NewChannel, sshRequests <-chan *ssh.Request) *Conn {
 	newChannels := make(chan *NewChannel)
 	requests := make(chan *ssh.Request)
 	connection := &Conn{
@@ -148,7 +139,20 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 			}
 		}
 	}()
-	return connection, nil
+	return connection
+}
+
+func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to dial: %w", err)
+	}
+	sshConn, sshNewChannels, sshRequests, err := ssh.NewClientConn(conn, address, config)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("Failed to establish SSH client connection: %w", err)
+	}
+	return handleConn(sshConn, sshNewChannels, sshRequests), nil
 }
 
 type Listener struct {
@@ -166,34 +170,7 @@ func (listener *Listener) Accept() (*Conn, error) {
 		conn.Close()
 		return nil, fmt.Errorf("Failed to establish SSH server connection: %w", err)
 	}
-	newChannels := make(chan *NewChannel)
-	requests := make(chan *ssh.Request)
-	connection := &Conn{
-		Conn:        sshConn,
-		NewChannels: newChannels,
-		Requests:    requests,
-	}
-	go func() {
-		for sshNewChannels != nil || sshRequests != nil {
-			select {
-			case newChannel, ok := <-sshNewChannels:
-				if !ok {
-					close(newChannels)
-					sshNewChannels = nil
-					continue
-				}
-				newChannels <- &NewChannel{newChannel, connection}
-			case request, ok := <-sshRequests:
-				if !ok {
-					close(requests)
-					sshRequests = nil
-					continue
-				}
-				requests <- request
-			}
-		}
-	}()
-	return connection, nil
+	return handleConn(sshConn, sshNewChannels, sshRequests), nil
 }
 
 func Listen(address string, config *ssh.ServerConfig) (*Listener, error) {
