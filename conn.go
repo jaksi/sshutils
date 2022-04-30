@@ -116,21 +116,36 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial: %w", err)
 	}
-	sshConn, sshNewChannels, requests, err := ssh.NewClientConn(conn, address, config)
+	sshConn, sshNewChannels, sshRequests, err := ssh.NewClientConn(conn, address, config)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("Failed to establish SSH client connection: %w", err)
 	}
 	newChannels := make(chan *NewChannel)
+	requests := make(chan *ssh.Request)
 	connection := &Conn{
 		Conn:        sshConn,
 		NewChannels: newChannels,
 		Requests:    requests,
 	}
 	go func() {
-		defer close(newChannels)
-		for sshNewChannel := range sshNewChannels {
-			newChannels <- &NewChannel{sshNewChannel, connection}
+		for sshNewChannels != nil || sshRequests != nil {
+			select {
+			case newChannel, ok := <-sshNewChannels:
+				if !ok {
+					close(newChannels)
+					sshNewChannels = nil
+					continue
+				}
+				newChannels <- &NewChannel{newChannel, connection}
+			case request, ok := <-sshRequests:
+				if !ok {
+					close(requests)
+					sshRequests = nil
+					continue
+				}
+				requests <- request
+			}
 		}
 	}()
 	return connection, nil
@@ -146,21 +161,36 @@ func (listener *Listener) Accept() (*Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to accept connection: %w", err)
 	}
-	sshConn, sshNewChannels, requests, err := ssh.NewServerConn(conn, &listener.config)
+	sshConn, sshNewChannels, sshRequests, err := ssh.NewServerConn(conn, &listener.config)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("Failed to establish SSH server connection: %w", err)
 	}
 	newChannels := make(chan *NewChannel)
+	requests := make(chan *ssh.Request)
 	connection := &Conn{
 		Conn:        sshConn,
 		NewChannels: newChannels,
 		Requests:    requests,
 	}
 	go func() {
-		defer close(newChannels)
-		for sshNewChannel := range sshNewChannels {
-			newChannels <- &NewChannel{sshNewChannel, connection}
+		for sshNewChannels != nil || sshRequests != nil {
+			select {
+			case newChannel, ok := <-sshNewChannels:
+				if !ok {
+					close(newChannels)
+					sshNewChannels = nil
+					continue
+				}
+				newChannels <- &NewChannel{newChannel, connection}
+			case request, ok := <-sshRequests:
+				if !ok {
+					close(requests)
+					sshRequests = nil
+					continue
+				}
+				requests <- request
+			}
 		}
 	}()
 	return connection, nil
