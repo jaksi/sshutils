@@ -91,7 +91,7 @@ func ExampleDial() {
 		log.Panic("Failed to request direct-tcpip: ", err)
 	}
 
-	session, err := conn.NewChannel("session", nil)
+	session, err := conn.Channel("session", nil)
 	if err != nil {
 		log.Panic("Failed to open channel: ", err)
 	}
