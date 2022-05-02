@@ -144,7 +144,7 @@ func TestChannelFail(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	if clientChannel, err := clientConn.NewChannel("test", nil); err == nil {
+	if clientChannel, err := clientConn.Channel("test", nil); err == nil {
 		clientChannel.Close()
 		t.Error("new channel should fail")
 	}
@@ -187,7 +187,7 @@ func getChannelPair(t *testing.T, clientConn, serverConn *sshutils.Conn) (*sshut
 		}
 		serverChannelChan <- serverChannel
 	}()
-	clientChannel, err := clientConn.NewChannel(name, payload)
+	clientChannel, err := clientConn.Channel(name, payload)
 	if err != nil {
 		t.Fatal(err)
 	}

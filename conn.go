@@ -15,12 +15,8 @@ type Conn struct {
 	nextChannelID int
 }
 
-func (conn *Conn) NewChannel(name string, payload Payload) (*Channel, error) {
-	var data []byte
-	if payload != nil {
-		data = payload.Marshal()
-	}
-	sshChannel, requests, err := conn.Conn.OpenChannel(name, data)
+func (conn *Conn) RawChannel(name string, payload []byte) (*Channel, error) {
+	sshChannel, requests, err := conn.Conn.OpenChannel(name, payload)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open channel: %w", err)
 	}
@@ -29,8 +25,24 @@ func (conn *Conn) NewChannel(name string, payload Payload) (*Channel, error) {
 	return channel, nil
 }
 
+func (conn *Conn) Channel(name string, payload Payload) (*Channel, error) {
+	var data []byte
+	if payload != nil {
+		data = payload.Marshal()
+	}
+	return conn.RawChannel(name, data)
+}
+
 func (conn *Conn) String() string {
 	return base64.StdEncoding.EncodeToString(conn.SessionID())
+}
+
+func (conn *Conn) RawRequest(name string, wantReply bool, payload []byte) (bool, []byte, error) {
+	accepted, reply, err := conn.SendRequest(name, wantReply, payload)
+	if err != nil {
+		return false, nil, fmt.Errorf("Failed to send request: %w", err)
+	}
+	return accepted, reply, nil
 }
 
 func (conn *Conn) Request(name string, wantReply bool, payload Payload) (bool, []byte, error) {
@@ -38,11 +50,7 @@ func (conn *Conn) Request(name string, wantReply bool, payload Payload) (bool, [
 	if payload != nil {
 		data = payload.Marshal()
 	}
-	accepted, reply, err := conn.SendRequest(name, wantReply, data)
-	if err != nil {
-		return false, nil, fmt.Errorf("Failed to send request: %w", err)
-	}
-	return accepted, reply, nil
+	return conn.RawRequest(name, wantReply, data)
 }
 
 type NewChannel struct {
@@ -99,16 +107,20 @@ func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
 	return channel.conn
 }
 
+func (channel *Channel) RawRequest(name string, wantReply bool, payload []byte) (bool, error) {
+	accepted, err := channel.SendRequest(name, wantReply, payload)
+	if err != nil {
+		return false, fmt.Errorf("Failed to send request: %w", err)
+	}
+	return accepted, nil
+}
+
 func (channel *Channel) Request(name string, wantReply bool, payload Payload) (bool, error) {
 	var data []byte
 	if payload != nil {
 		data = payload.Marshal()
 	}
-	accepted, err := channel.SendRequest(name, wantReply, data)
-	if err != nil {
-		return false, fmt.Errorf("Failed to send request: %w", err)
-	}
-	return accepted, nil
+	return channel.RawRequest(name, wantReply, data)
 }
 
 func handleConn(sshConn ssh.Conn, sshNewChannels <-chan ssh.NewChannel, sshRequests <-chan *ssh.Request) *Conn {
