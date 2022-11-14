@@ -1,269 +1,281 @@
 package sshutils_test
 
 import (
+	"encoding/hex"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )
 
-func TestDialFail(t *testing.T) {
+func TestListen_InUse(t *testing.T) {
 	t.Parallel()
-	_, err := sshutils.Dial("localhost:0", &ssh.ClientConfig{})
-	if err == nil {
-		t.Fatal("dial should fail")
-	}
-}
-
-func TestListenFail(t *testing.T) {
-	t.Parallel()
-	_, err := sshutils.Listen("example.org:0", &ssh.ServerConfig{})
-	if err == nil {
-		t.Fatal("listen should fail")
-	}
-}
-
-func TestConnFail(t *testing.T) {
-	t.Parallel()
-	hostKey, err := sshutils.GenerateHostKey(sshutils.Ed25519)
+	//nolint:exhaustivestruct,exhaustruct
+	serverConfig := &ssh.ServerConfig{}
+	listener1, err := sshutils.Listen("localhost:0", serverConfig)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Listen() error = %v", err)
 	}
-	serverConfig := &ssh.ServerConfig{
-		PasswordCallback: func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) { return nil, nil },
+	defer listener1.Close()
+	listener2, err := sshutils.Listen(listener1.Addr().String(), serverConfig)
+	if expectedError := "failed to listen: listen tcp"; err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Listen() error = %v, want %q", err, expectedError)
 	}
-	serverConfig.AddHostKey(hostKey)
+	if listener2 != nil {
+		defer listener2.Close()
+	}
+}
+
+func TestAcceptDial_FailedToEstablish(t *testing.T) {
+	t.Parallel()
+	//nolint:exhaustivestruct,exhaustruct
+	serverConfig := &ssh.ServerConfig{}
 	listener, err := sshutils.Listen("localhost:0", serverConfig)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Listen() error = %v", err)
 	}
 	defer listener.Close()
+	//nolint:exhaustivestruct,exhaustruct
+	clientConfig := &ssh.ClientConfig{}
+	errChan := make(chan error)
 	go func() {
-		serverConn, err := listener.Accept()
-		if err == nil {
-			serverConn.Close()
-			t.Error("accept should fail")
+		conn, err := sshutils.Dial(listener.Addr().String(), clientConfig)
+		if conn != nil {
+			conn.Close()
 		}
+		errChan <- err
 	}()
-	if clientConn, err := sshutils.Dial(listener.Addr().String(),
-		&ssh.ClientConfig{HostKeyCallback: ssh.InsecureIgnoreHostKey()}); err == nil {
-		clientConn.Close()
-		t.Fatal("dial should fail")
+	conn, err := listener.Accept()
+	if conn != nil {
+		defer conn.Close()
+	}
+	expectedError := "failed to establish SSH connection: ssh: server has no host keys"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Accept() error = %v, want %q", err, expectedError)
+	}
+	expectedError = "failed to establish SSH connection: ssh: must specify HostKeyCallback"
+	if err = <-errChan; err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Dial() error = %v, want %q", err, expectedError)
 	}
 }
 
-func getConnPair(t *testing.T) (*sshutils.Conn, *sshutils.Conn) {
-	t.Helper()
-	hostKey, err := sshutils.GenerateHostKey(sshutils.Ed25519)
-	if err != nil {
-		t.Fatal(err)
+func TestDial_Error(t *testing.T) {
+	t.Parallel()
+	//nolint:exhaustivestruct,exhaustruct
+	clientConfig := &ssh.ClientConfig{}
+	conn, err := sshutils.Dial("localhost:0", clientConfig)
+	if conn != nil {
+		defer conn.Close()
 	}
-	serverConfig := &ssh.ServerConfig{NoClientAuth: true}
-	serverConfig.AddHostKey(hostKey)
-	listener, err := sshutils.Listen("localhost:0", serverConfig)
-	if err != nil {
-		t.Fatal(err)
+	expectedError := "failed to dial: dial tcp"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Dial() error = %v, want %q", err, expectedError)
 	}
-	defer listener.Close()
-	serverConnChan := make(chan *sshutils.Conn)
-	go func() {
-		serverConn, err := listener.Accept()
-		if err != nil {
-			t.Error(err)
-			serverConnChan <- nil
-			return
-		}
-		serverConnChan <- serverConn
-	}()
-	clientConn, err := sshutils.Dial(listener.Addr().String(),
-		&ssh.ClientConfig{HostKeyCallback: ssh.InsecureIgnoreHostKey()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	serverConn := <-serverConnChan
-	return clientConn, serverConn
 }
 
 func TestConn(t *testing.T) {
 	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	if clientConn == nil {
-		t.Fatal("client connection is nil")
-	}
-	if serverConn == nil {
-		t.Fatal("server connection is nil")
-	}
-	defer clientConn.Close()
-	defer serverConn.Close()
-	if clientConn.String() != serverConn.String() {
-		t.Error("client and server connection strings are not equal")
-	}
-}
 
-func TestGlobalRequest(t *testing.T) {
-	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	defer clientConn.Close()
-	defer serverConn.Close()
-	payload := &sshutils.TcpipForwardRequestPayload{
-		Address: "localhost",
-		Port:    80,
+	//nolint:exhaustivestruct,exhaustruct
+	serverConfig := &ssh.ServerConfig{
+		NoClientAuth: true,
 	}
-	_, _, err := clientConn.Request("tcpip-forward", false, payload)
+	key, err := sshutils.GenerateHostKey(nil, sshutils.Ed25519)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("GenerateHostKey() error = %v", err)
 	}
-	serverRequest := <-serverConn.Requests
-	if serverRequest.Type != "tcpip-forward" {
-		t.Error("wrong request type")
-	}
-	if serverRequest.WantReply != false {
-		t.Error("want reply is not false")
-	}
-	serverPayload, err := sshutils.UnmarshalGlobalRequestPayload(serverRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	concreteServerPayload, ok := serverPayload.(*sshutils.TcpipForwardRequestPayload)
-	if !ok {
-		t.Fatal("wrong payload type")
-	}
-	if *concreteServerPayload != *payload {
-		t.Error("wrong payload")
-	}
-}
+	serverConfig.AddHostKey(key)
 
-func TestChannelFail(t *testing.T) {
-	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	defer clientConn.Close()
-	defer serverConn.Close()
+	//nolint:exhaustivestruct,exhaustruct
+	clientConfig := &ssh.ClientConfig{
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	listener, err := sshutils.Listen("localhost:0", serverConfig)
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer listener.Close()
+
+	clientConnChan := make(chan *sshutils.Conn)
 	go func() {
-		newChannel := <-serverConn.NewChannels
-		if err := newChannel.Reject(ssh.Prohibited, "test"); err != nil {
-			t.Error(err)
+		clientConn, err := sshutils.Dial(listener.Addr().String(), clientConfig)
+		if err != nil {
+			t.Errorf("Dial() error = %v", err)
 		}
+		clientConnChan <- clientConn
 	}()
-	if clientChannel, err := clientConn.Channel("test", nil); err == nil {
-		clientChannel.Close()
-		t.Error("new channel should fail")
-	}
-}
 
-func getChannelPair(t *testing.T, clientConn, serverConn *sshutils.Conn) (*sshutils.Channel, *sshutils.Channel) {
-	t.Helper()
-	name := "direct-tcpip"
-	payload := &sshutils.DirectTcpipChannelPayload{
-		Address:           "localhost",
-		Port:              80,
-		OriginatorAddress: "localhost",
-		OriginatorPort:    8080,
+	serverConn, err := listener.Accept()
+	if err != nil {
+		t.Fatalf("Accept() error = %v", err)
 	}
-	serverChannelChan := make(chan *sshutils.Channel)
+	defer serverConn.Close()
+
+	clientConn := <-clientConnChan
+	if clientConn == nil {
+		t.Fatal("Dial() = nil")
+	}
+
+	expectedString := hex.EncodeToString(clientConn.SessionID())
+	if clientConn.String() != expectedString {
+		t.Errorf("String() = %v, want %v", clientConn.String(), expectedString)
+	}
+	if serverConn.String() != expectedString {
+		t.Errorf("String() = %v, want %v", serverConn.String(), expectedString)
+	}
+
+	_, _, err = clientConn.Request("tcpip-forward", false, &sshutils.TcpipForwardRequestPayload{"foo", 42})
+	if err != nil {
+		t.Errorf("Request() error = %v", err)
+	}
+	request := <-serverConn.Requests
+	expectedString = "tcpip-forward: foo:42"
+	if payload, err := request.UnmarshalPayload(); err != nil {
+		t.Errorf("UnmarshalPayload() error = %v", err)
+	} else if payload.String() != expectedString {
+		t.Errorf("String() = %v, want %v", payload.String(), expectedString)
+	}
+	expectedVersion := "SSH-2.0-Go"
+	if string(request.ConnMetadata().ClientVersion()) != expectedVersion {
+		t.Errorf("ClientVersion() = %v, want %v", string(request.ConnMetadata().ClientVersion()), expectedVersion)
+	}
+	expectedString = "tcpip-forward"
+	if request.String() != expectedString {
+		t.Errorf("String() = %v, want %v", request.String(), expectedString)
+	}
+	channels := make(chan *sshutils.Channel)
 	go func() {
-		newChannel := <-serverConn.NewChannels
-		if newChannel.String() != name {
-			t.Error("wrong channel name")
-		}
-		if newChannel.ConnMetadata() != serverConn {
-			t.Error("wrong connection metadata")
-		}
-		serverPayload, err := newChannel.Payload()
-		if err != nil {
-			t.Error(err)
-		}
-		concreteServerPayload, ok := serverPayload.(*sshutils.DirectTcpipChannelPayload)
-		if !ok {
-			t.Error("wrong payload type")
-		}
-		if *concreteServerPayload != *payload {
-			t.Error("wrong payload")
-		}
-		serverChannel, err := newChannel.AcceptChannel()
-		if err != nil {
-			t.Error(err)
-			serverChannelChan <- nil
+		newChannel := <-clientConn.NewChannels
+		if err := newChannel.Reject(ssh.Prohibited, "foo"); err != nil {
+			t.Errorf("Reject() error = %v", err)
+			channels <- nil
 			return
 		}
-		serverChannelChan <- serverChannel
+		newChannel = <-clientConn.NewChannels
+		expectedString := "tun: ethernet, interface: 0"
+		if payload, err := newChannel.UnmarshalPayload(); err != nil {
+			t.Errorf("UnmarshalPayload() error = %v", err)
+		} else if payload.String() != expectedString {
+			t.Errorf("String() = %v, want %v", payload.String(), expectedString)
+		}
+		if string(newChannel.ConnMetadata().ClientVersion()) != expectedVersion {
+			t.Errorf("ClientVersion() = %v, want %v", string(newChannel.ConnMetadata().ClientVersion()), expectedVersion)
+		}
+		expectedString = "tun@openssh.com"
+		if newChannel.String() != expectedString {
+			t.Errorf("String() = %v, want %v", newChannel.String(), expectedString)
+		}
+		channel, err := newChannel.AcceptChannel()
+		if err != nil {
+			t.Errorf("AcceptChannel() error = %v", err)
+			channels <- nil
+			return
+		}
+		channels <- channel
 	}()
-	clientChannel, err := clientConn.Channel(name, payload)
+	_, err = serverConn.Channel("foo", nil)
+	expectedError := "failed to open channel: ssh: rejected: administratively prohibited (foo)"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Channel() error = %v, want %v", err, expectedError)
+	}
+	serverChannel, err := serverConn.Channel("tun@openssh.com",
+		&sshutils.TunChannelPayload{sshutils.TunChannelModeEthernet, 0})
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("Channel() error = %v", err)
 	}
-	serverChannel := <-serverChannelChan
-	return clientChannel, serverChannel
-}
+	clientChannel := <-channels
+	if clientChannel == nil {
+		t.Fatal("AcceptChannel() = nil")
+	}
+	if serverChannel != nil && clientChannel != nil {
+		expectedChannelID := "0"
+		if serverChannel.ChannelID() != expectedChannelID {
+			t.Errorf("ChannelID() = %v, want %v", serverChannel.ChannelID(), expectedChannelID)
+		}
+		if clientChannel.ChannelID() != expectedChannelID {
+			t.Errorf("ChannelID() = %v, want %v", clientChannel.ChannelID(), expectedChannelID)
+		}
+		expectedType := "tun@openssh.com"
+		if serverChannel.ChannelType() != expectedType {
+			t.Errorf("ChannelType() = %v, want %v", serverChannel.ChannelType(), expectedType)
+		}
+		if clientChannel.ChannelType() != expectedType {
+			t.Errorf("ChannelType() = %v, want %v", clientChannel.ChannelType(), expectedType)
+		}
+		if string(serverChannel.ConnMetadata().ClientVersion()) != expectedVersion {
+			t.Errorf("ClientVersion() = %v, want %v", string(serverChannel.ConnMetadata().ClientVersion()), expectedVersion)
+		}
+		if string(clientChannel.ConnMetadata().ClientVersion()) != expectedVersion {
+			t.Errorf("ClientVersion() = %v, want %v", string(clientChannel.ConnMetadata().ClientVersion()), expectedVersion)
+		}
+		expectedString = "0"
+		if serverChannel.String() != expectedString {
+			t.Errorf("String() = %v, want %v", serverChannel.String(), expectedString)
+		}
+		if clientChannel.String() != expectedString {
+			t.Errorf("String() = %v, want %v", clientChannel.String(), expectedString)
+		}
 
-func testChannel(t *testing.T, conn1, conn2 *sshutils.Conn) {
-	t.Helper()
-	channel1, channel2 := getChannelPair(t, conn1, conn2)
-	if channel1 == nil {
-		t.Fatal("channel1 is nil")
-	}
-	if channel2 == nil {
-		t.Fatal("channel2 is nil")
-	}
-	if channel1.String() != channel2.String() {
-		t.Error("channel strings are not equal")
-	}
-	if channel1.ChannelID() != channel2.ChannelID() {
-		t.Error("channel ids are not equal")
-	}
-	if channel1.ChannelType() != channel2.ChannelType() {
-		t.Error("channel types are not equal")
-	}
-	if channel1.ConnMetadata() != conn1 {
-		t.Error("connection metadata for channel1 is not conn1")
-	}
-	if channel2.ConnMetadata() != conn2 {
-		t.Error("connection metadata for channel2 is not conn2")
-	}
-}
+		_, err = serverChannel.Request("env", false, &sshutils.EnvRequestPayload{"foo", "bar"})
+		if err != nil {
+			t.Errorf("Request() error = %v", err)
+		}
+		channelRequest := <-clientChannel.Requests
+		expectedString = "env: foo=bar"
+		if payload, err := channelRequest.UnmarshalPayload(); err != nil {
+			t.Errorf("UnmarshalPayload() error = %v", err)
+		} else if payload.String() != expectedString {
+			t.Errorf("String() = %v, want %v", payload.String(), expectedString)
+		}
+		if channelRequest.Channel().ChannelID() != expectedChannelID {
+			t.Errorf("ChannelID() = %v, want %v", channelRequest.Channel().ChannelID(), expectedChannelID)
+		}
+		if string(channelRequest.ConnMetadata().ClientVersion()) != expectedVersion {
+			t.Errorf("ClientVersion() = %v, want %v", string(channelRequest.ConnMetadata().ClientVersion()), expectedVersion)
+		}
+		expectedString = "env"
+		if channelRequest.String() != expectedString {
+			t.Errorf("String() = %v, want %v", channelRequest.String(), expectedString)
+		}
 
-func TestChannelC2S(t *testing.T) {
-	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	defer clientConn.Close()
-	defer serverConn.Close()
-	testChannel(t, clientConn, serverConn)
-}
+		serverChannel.Close()
+		_, err = clientChannel.Request("foo", true, nil)
+		expectedError := "failed to send request: EOF"
+		if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+			t.Errorf("Request() error = %v, want %v", err, expectedError)
+		}
+	}
 
-func TestChannelS2C(t *testing.T) {
-	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	defer clientConn.Close()
-	defer serverConn.Close()
-	testChannel(t, serverConn, clientConn)
-}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		newChannel := <-clientConn.NewChannels
+		clientConn.Close()
+		_, err = newChannel.AcceptChannel()
+		expectedError = "failed to open channel"
+		if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+			t.Errorf("AcceptChannel() error = %v, want %v", err, expectedError)
+		}
+	}()
+	_, err = serverConn.Channel("closing", nil)
+	expectedError = "failed to open channel: ssh:"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Channel() error = %v, want %v", err, expectedError)
+	}
+	wg.Wait()
 
-func TestChannelRequest(t *testing.T) {
-	t.Parallel()
-	clientConn, serverConn := getConnPair(t)
-	defer clientConn.Close()
-	defer serverConn.Close()
-	clientChannel, serverChannel := getChannelPair(t, clientConn, serverConn)
-	payload := &sshutils.ExecRequestPayload{"/usr/bin/whoami"}
-	_, err := clientChannel.Request("exec", false, payload)
-	if err != nil {
-		t.Fatal(err)
+	_, _, err = serverConn.Request("foo", true, nil)
+	expectedError = "failed to send request: EOF"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Request() error = %v, want %q", err, expectedError)
 	}
-	serverRequest := <-serverChannel.Requests
-	if serverRequest.Type != "exec" {
-		t.Error("wrong request type")
-	}
-	if serverRequest.WantReply != false {
-		t.Error("want reply is not false")
-	}
-	serverPayload, err := sshutils.UnmarshalChannelRequestPayload(serverRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	concreteServerPayload, ok := serverPayload.(*sshutils.ExecRequestPayload)
-	if !ok {
-		t.Fatal("wrong payload type")
-	}
-	if *concreteServerPayload != *payload {
-		t.Error("wrong payload")
+	_, err = clientConn.Channel("bar", nil)
+	expectedError = "failed to open channel: read tcp"
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Channel() error = %v, want %q", err, expectedError)
 	}
 }

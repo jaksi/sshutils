@@ -4,13 +4,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"golang.org/x/crypto/ssh"
@@ -19,6 +18,12 @@ import (
 const (
 	rsaKeyBitSize    = 2048
 	hostKeyFilePerms = 0o600
+)
+
+var (
+	ErrInvalidKey         = errors.New("invalid key")
+	ErrInvalidKeyFile     = errors.New("invalid key file")
+	ErrUnsupportedKeyType = errors.New("unsupported key type")
 )
 
 type KeyType int
@@ -38,7 +43,7 @@ func (t KeyType) String() string {
 	case Ed25519:
 		return "ed25519"
 	default:
-		return "unknown"
+		return fmt.Sprintf("unknown type (%d)", t)
 	}
 }
 
@@ -54,7 +59,7 @@ func (key *HostKey) String() string {
 func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	signer, err := ssh.NewSignerFromKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create signer: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidKey, err)
 	}
 	return &HostKey{
 		Signer: signer,
@@ -62,52 +67,53 @@ func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	}, nil
 }
 
-var ErrUnsupportedKeyType = errors.New("unsupported key type")
-
-func GenerateHostKey(t KeyType) (*HostKey, error) {
+func GenerateHostKey(rand io.Reader, t KeyType) (*HostKey, error) {
 	var key interface{}
-	err := ErrUnsupportedKeyType
+	var err error
 	switch t {
 	case RSA:
-		key, err = rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
+		key, err = rsa.GenerateKey(rand, rsaKeyBitSize)
 	case ECDSA:
-		key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		key, err = ecdsa.GenerateKey(elliptic.P256(), rand)
 	case Ed25519:
-		_, key, err = ed25519.GenerateKey(rand.Reader)
+		_, key, err = ed25519.GenerateKey(rand)
+	default:
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedKeyType, t)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("Failed to generate key: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidKey, err)
 	}
 	return hostKeyFromKey(key)
 }
 
 func LoadHostKey(fileName string) (*HostKey, error) {
-	keyBytes, err := ioutil.ReadFile(fileName)
+	keyBytes, err := os.ReadFile(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read key file: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
 	}
 	key, err := ssh.ParseRawPrivateKey(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse key: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
 	}
 	return hostKeyFromKey(key)
 }
 
 func (key *HostKey) Save(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, hostKeyFilePerms)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, hostKeyFilePerms) //nolint:nosnakecase
 	if err != nil {
-		return fmt.Errorf("Failed to open key file: %w", err)
+		return fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
 	}
 	defer file.Close()
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(key.key)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal key: %w", err)
+		return fmt.Errorf("%w: %v", ErrInvalidKey, err)
 	}
 	if _, err = file.Write(pem.EncodeToMemory(&pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: keyBytes,
+		Type:    "PRIVATE KEY",
+		Headers: nil,
+		Bytes:   keyBytes,
 	})); err != nil {
-		return fmt.Errorf("Failed to write key file: %w", err)
+		return fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
 	}
 	return nil
 }

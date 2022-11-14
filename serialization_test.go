@@ -2,1139 +2,1008 @@ package sshutils_test
 
 import (
 	"bytes"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )
 
-var (
-	sessionID = []byte{0x42}
-
-	directTcpipChannelPayloadBytes = []byte{
-		0x00, 0x00, 0x00, 0x09, '1', '2', '7', '.', '0', '.', '0', '.', '1',
-		0x00, 0x00, 0x16, 0x2e,
-		0x00, 0x00, 0x00, 0x09, '1', '2', '7', '.', '0', '.', '0', '.', '1',
-		0x00, 0x00, 0xf4, 0x27,
-	}
-	directTcpipChannelPayload = &sshutils.DirectTcpipChannelPayload{
-		Address:           "127.0.0.1",
-		Port:              5678,
-		OriginatorAddress: "127.0.0.1",
-		OriginatorPort:    62503,
-	}
-
-	tcpipForwardRequestPayloadBytes = []byte{
-		0x00, 0x00, 0x00, 0xb, 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'o', 'r', 'g',
-		0x00, 0x00, 0x01, 0xbb,
-	}
-	tcpipForwardRequestPayload = &sshutils.TcpipForwardRequestPayload{
-		Address: "example.org",
-		Port:    443,
-	}
-	cancelTcpipForwardRequestPayload = &sshutils.CancelTcpipForwardRequestPayload{
-		Address: "example.org",
-		Port:    443,
-	}
-
-	x11RequestPayloadBytes = []byte{
-		0x01,
-		0x00, 0x00, 0x00, 0x03, 'f', 'o', 'o',
-		0x00, 0x00, 0x00, 0x02, '4', '2',
-		0x00, 0x00, 0x00, 0x00,
-	}
-	x11RequestPayload = &sshutils.X11RequestPayload{
-		SingleConnection:       true,
-		AuthenticationProtocol: "foo",
-		AuthenticationCookie:   "42",
-		ScreenNumber:           0,
-	}
-
-	ptyRequestPayloadBytes = []byte{
-		0x00, 0x00, 0x00, 0x05, 'x', 't', 'e', 'r', 'm',
-		0x00, 0x00, 0x00, 0x50,
-		0x00, 0x00, 0x00, 0x18,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-	}
-	terminalModesBytes = []byte{
-		ssh.ECHO,
-		0x00, 0x00, 0x00, 0x01,
-		ssh.TTY_OP_ISPEED,
-		0x00, 0x00, 0x38, 0x40,
-		ssh.TTY_OP_OSPEED,
-		0x00, 0x00, 0x38, 0x40,
-	}
-	ptyRequestPayload = &sshutils.PtyRequestPayload{
-		Term:     "xterm",
-		Width:    80,
-		Height:   24,
-		WidthPx:  0,
-		HeightPx: 0,
-		TerminalModes: ssh.TerminalModes{
-			ssh.ECHO:          1,
-			ssh.TTY_OP_ISPEED: 14400,
-			ssh.TTY_OP_OSPEED: 14400,
-		},
-	}
-
-	envRequestPayloadBytes = []byte{
-		0x00, 0x00, 0x00, 0x03, 'f', 'o', 'o',
-		0x00, 0x00, 0x00, 0x03, 'b', 'a', 'r',
-	}
-	envRequestPayload = &sshutils.EnvRequestPayload{
-		Name:  "foo",
-		Value: "bar",
-	}
-
-	execRequestPayloadBytes = []byte{0x00, 0x00, 0x00, 0x07, '/', 'b', 'i', 'n', '/', 's', 'h'}
-	execRequestPayload      = &sshutils.ExecRequestPayload{
-		Command: "/bin/sh",
-	}
-
-	subsystemRequestPayloadBytes = []byte{0x00, 0x00, 0x00, 0x04, 's', 'f', 't', 'p'}
-	subsystemRequestPayload      = &sshutils.SubsystemRequestPayload{
-		Subsystem: "sftp",
-	}
-
-	windowChangeRequestPayloadBytes = []byte{
-		0x00, 0x00, 0x00, 0x78,
-		0x00, 0x00, 0x00, 0x50,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-	}
-	windowChangeRequestPayload = &sshutils.WindowChangeRequestPayload{
-		Width:    120,
-		Height:   80,
-		WidthPx:  0,
-		HeightPx: 0,
-	}
-
-	exitStatusRequestPayloadBytes = []byte{0x00, 0x00, 0x00, 0x01}
-	exitStatusRequestPayload      = &sshutils.ExitStatusRequestPayload{
-		ExitStatus: 1,
-	}
-)
-
-type mockNewChannel struct {
+type fakeNewChannel struct {
 	channelType string
 	extraData   []byte
-	canAccept   bool
 }
 
-func (newChannel *mockNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, error) {
-	if !newChannel.canAccept {
-		return nil, nil, fmt.Errorf("mockNewChannel: cannot accept")
-	}
-	return nil, nil, nil
-}
-
-func (newChannel *mockNewChannel) Reject(reason ssh.RejectionReason, message string) error {
+func (newChannel *fakeNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, error) {
 	panic("not implemented")
 }
 
-func (newChannel *mockNewChannel) ChannelType() string {
+func (newChannel *fakeNewChannel) Reject(reason ssh.RejectionReason, message string) error {
+	panic("not implemented")
+}
+
+func (newChannel *fakeNewChannel) ChannelType() string {
 	return newChannel.channelType
 }
 
-func (newChannel *mockNewChannel) ExtraData() []byte {
+func (newChannel *fakeNewChannel) ExtraData() []byte {
 	return newChannel.extraData
 }
 
-func (newChannel *mockNewChannel) String() string {
-	return fmt.Sprintf("NewChannel: %v(%v)", newChannel.channelType, newChannel.extraData)
+func testPayload(
+	t *testing.T,
+	rawPayload []byte,
+	payload sshutils.Payload, err error,
+	expectedPayload sshutils.Payload, expectedString string, expectedError string,
+) {
+	t.Helper()
+	if err != nil || expectedError != "" {
+		if (err != nil && (expectedError == "" || !strings.HasPrefix(err.Error(), expectedError))) ||
+			(err == nil && expectedError != "") {
+			t.Errorf("Unmarshal() error = %v, want %q", err, expectedError)
+		}
+		return
+	}
+	if !reflect.DeepEqual(payload, expectedPayload) {
+		t.Errorf("Unmarshal() = %#v, want %#v", payload, expectedPayload)
+	}
+	if str := payload.String(); str != expectedString {
+		t.Errorf("String() = %v, want %v", str, expectedString)
+	}
+	if data := payload.Marshal(); !bytes.Equal(data, rawPayload) {
+		t.Errorf("Marshal() = %v, want %v", data, rawPayload)
+	}
 }
 
-func TestUnmarshalSessionChannelPayload(t *testing.T) {
+func TestNewChannelPayload(t *testing.T) {
 	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.SessionChannelPayload
-		expectedString  string
-		expectedError   bool
+	for _, tt := range []struct {
+		name       string
+		newChannel *fakeNewChannel
+		payload    sshutils.Payload
+		str        string
+		err        string
 	}{
-		{nil, &sshutils.SessionChannelPayload{}, "session", false},
-		{[]byte{}, &sshutils.SessionChannelPayload{}, "session", false},
-		{[]byte{42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.SessionChannelPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalSessionChannelPayload(t *testing.T) {
-	t.Parallel()
-	payload := &sshutils.SessionChannelPayload{}
-	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
-		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
-	}
-}
-
-func TestUnmarshalDirectTcpipChannelPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.DirectTcpipChannelPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{directTcpipChannelPayloadBytes, directTcpipChannelPayload, "direct-tcpip: 127.0.0.1:62503 -> 127.0.0.1:5678", false},
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.DirectTcpipChannelPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal() = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalDirectTcpipChannelPayload(t *testing.T) {
-	t.Parallel()
-	output := directTcpipChannelPayload.Marshal()
-	if !bytes.Equal(output, directTcpipChannelPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, directTcpipChannelPayloadBytes)
-	}
-}
-
-func TestUnmarshalNewChannelPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           ssh.NewChannel
-		expectedPayload sshutils.Payload
-		expectedError   bool
-	}{
-		{&mockNewChannel{"session", nil, true}, &sshutils.SessionChannelPayload{}, false},
-		{&mockNewChannel{"session", []byte{42}, true}, nil, true},
-		{&mockNewChannel{"direct-tcpip", directTcpipChannelPayloadBytes, true}, directTcpipChannelPayload, false},
-		{&mockNewChannel{"direct-tcpip", nil, true}, nil, true},
-		{&mockNewChannel{"test", nil, true}, nil, true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload, err := sshutils.UnmarshalNewChannelPayload(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("UnmarshalNewChannelPayload(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("UnmarshalNewChannelPayload(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("UnmarshalNewChannelPayload(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-			}
-		})
-	}
-}
-
-func TestUnmarshalHostkeysRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.HostkeysRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, "hostkeys: []", false},
-		{[]byte{}, &sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, "hostkeys: []", false},
 		{
-			rsaHostkeyRequestPayloadBytes,
-			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			fmt.Sprintf("hostkeys: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())),
-			false,
-		},
-		{
-			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
-			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			fmt.Sprintf("hostkeys: [%v, %v]",
-				ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())),
-			false,
-		},
-		{[]byte{0x42}, nil, "", true},
-		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
-		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			var payload sshutils.HostkeysRequestPayload
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal() = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal() = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(&payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal() = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalHostkeysRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input          *sshutils.HostkeysRequestPayload
-		expectedOutput []byte
-	}{
-		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{}}, []byte{}},
-		{&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
-		{
-			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			output := testCase.input.Marshal()
-			if !bytes.Equal(output, testCase.expectedOutput) {
-				t.Errorf("Marshal() = %v, want %v", output, testCase.expectedOutput)
-			}
-		})
-	}
-}
-
-func TestUnmarshalHostkeysProveRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.HostkeysProveRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, "hostkeys_prove: []", false},
-		{[]byte{}, &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, "hostkeys_prove: []", false},
-		{
-			rsaHostkeyRequestPayloadBytes,
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			fmt.Sprintf("hostkeys_prove: [%v]", ssh.FingerprintSHA256(rsaHostKey.PublicKey())),
-			false,
-		},
-		{
-			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			fmt.Sprintf("hostkeys_prove: [%v, %v]",
-				ssh.FingerprintSHA256(rsaHostKey.PublicKey()), ssh.FingerprintSHA256(ecdsaHostKey.PublicKey())),
-			false,
-		},
-		{[]byte{0x42}, nil, "", true},
-		{[]byte{0x00, 0x00, 0x00, 0x42}, nil, "", true},
-		{[]byte{0x00, 0x00, 0x00, 0x01, 0x42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			var payload sshutils.HostkeysProveRequestPayload
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal() = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal() = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(&payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal() = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalHostkeysProveRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input          *sshutils.HostkeysProveRequestPayload
-		expectedOutput []byte
-	}{
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []byte{}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, rsaHostkeyRequestPayloadBytes},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			append(rsaHostkeyRequestPayloadBytes, ecdsaHostkeyRequestPayloadBytes...),
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			output := testCase.input.Marshal()
-			if !bytes.Equal(output, testCase.expectedOutput) {
-				t.Errorf("Marshal() = %v, want %v", output, testCase.expectedOutput)
-			}
-		})
-	}
-}
-
-func TestHostkeysProveRequestPayloadResponse(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		request       *sshutils.HostkeysProveRequestPayload
-		hostKeys      []*sshutils.HostKey
-		expectedError bool
-	}{
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}, false},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
-			false,
-		},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
-			false,
-		},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []*sshutils.HostKey{}, true},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{ed25519HostKey.PublicKey()}},
-			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
-			true,
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("%v.Response(...) = %v, want non-nil", testCase.request, err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("%v.Response(...) = %v, want nil", testCase.request, err)
-				}
-				if len(testCase.request.Hostkeys) == 0 {
-					if len(response) != 0 {
-						t.Errorf("%v.Response(...) = %v, want empty", testCase.request, response)
-					}
-				} else {
-					if len(response) == 0 {
-						t.Errorf("%v.Response(...) = %v, want non-empty", testCase.request, response)
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestHostkeysProveRequestPayloadVerifyResponse(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		request  *sshutils.HostkeysProveRequestPayload
-		hostKeys []*sshutils.HostKey
-	}{
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []*sshutils.HostKey{rsaHostKey, ecdsaHostKey}},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
-		},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey(), ecdsaHostKey.PublicKey()}},
-			[]*sshutils.HostKey{rsaHostKey, ecdsaHostKey},
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			response, err := testCase.request.Response(testCase.hostKeys, sessionID)
-			if err != nil {
-				t.Fatalf("%v.Response(...) = %v, want nil", testCase.request, err)
-			}
-			err = testCase.request.VerifyResponse(response, sessionID)
-			if err != nil {
-				t.Errorf("%v.VerifyResponse(...) = %v, want nil", testCase.request, err)
-			}
-		})
-	}
-}
-
-func TestHostkeysProveRequestPayloadVerifyResponseErr(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		request  *sshutils.HostkeysProveRequestPayload
-		response []byte
-	}{
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}, []byte{0x42}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []byte{}},
-		{&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}}, []byte{0x00, 0x00, 0x00, 0x00}},
-		{
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			ssh.Marshal(struct{ string }{string(ssh.Marshal(ssh.Signature{}))}),
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			err := testCase.request.VerifyResponse(testCase.response, sessionID)
-			if err == nil {
-				t.Errorf("%v.VerifyResponse(...) = %v, want non-nil", testCase.request, err)
-			}
-		})
-	}
-}
-
-func TestUnmarshalTcpipForwardRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.TcpipForwardRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{tcpipForwardRequestPayloadBytes, tcpipForwardRequestPayload, "tcpip-forward: example.org:443", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.TcpipForwardRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalTcpipForwardRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := tcpipForwardRequestPayload.Marshal()
-	if !bytes.Equal(output, tcpipForwardRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, tcpipForwardRequestPayloadBytes)
-	}
-}
-
-func TestTcpipForwardRequestPayloadResponse(t *testing.T) {
-	t.Parallel()
-	response := tcpipForwardRequestPayload.Response(42)
-	expectedResponse := []byte{0x00, 0x00, 0x00, 0x2a}
-	if !bytes.Equal(response, expectedResponse) {
-		t.Errorf("Response(...) = %v, want %v", response, expectedResponse)
-	}
-}
-
-func TestUnmarshalCancelTcpipForwardRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.CancelTcpipForwardRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{tcpipForwardRequestPayloadBytes, cancelTcpipForwardRequestPayload, "cancel-tcpip-forward: example.org:443", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.CancelTcpipForwardRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalCancelTcpipForwardRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := cancelTcpipForwardRequestPayload.Marshal()
-	if !bytes.Equal(output, tcpipForwardRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, tcpipForwardRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalNoMoreSessionsRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.NoMoreSessionsRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, &sshutils.NoMoreSessionsRequestPayload{}, "no-more-sessions", false},
-		{[]byte{}, &sshutils.NoMoreSessionsRequestPayload{}, "no-more-sessions", false},
-		{[]byte{0x42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.NoMoreSessionsRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalNoMoreSessionsRequestPayload(t *testing.T) {
-	t.Parallel()
-	payload := &sshutils.NoMoreSessionsRequestPayload{}
-	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
-		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
-	}
-}
-
-func TestUnmarshalGlobalRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           *ssh.Request
-		expectedPayload sshutils.Payload
-		expectedError   bool
-	}{
-		{&ssh.Request{Type: "tcpip-forward"}, nil, true},
-		{&ssh.Request{Type: "tcpip-forward", Payload: tcpipForwardRequestPayloadBytes}, tcpipForwardRequestPayload, false},
-		{&ssh.Request{Type: "cancel-tcpip-forward"}, nil, true},
-		{
-			&ssh.Request{Type: "cancel-tcpip-forward", Payload: tcpipForwardRequestPayloadBytes},
-			cancelTcpipForwardRequestPayload,
-			false,
-		},
-		{&ssh.Request{Type: "no-more-sessions@openssh.com", Payload: []byte{0x42}}, nil, true},
-		{&ssh.Request{Type: "no-more-sessions@openssh.com"}, &sshutils.NoMoreSessionsRequestPayload{}, false},
-		{&ssh.Request{Type: "hostkeys-00@openssh.com", Payload: []byte{0x42}}, nil, true},
-		{
-			&ssh.Request{Type: "hostkeys-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes},
-			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			false,
-		},
-		{&ssh.Request{Type: "hostkeys-prove-00@openssh.com", Payload: []byte{0x42}}, nil, true},
-		{
-			&ssh.Request{Type: "hostkeys-prove-00@openssh.com", Payload: rsaHostkeyRequestPayloadBytes},
-			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{rsaHostKey.PublicKey()}},
-			false,
-		},
-		{&ssh.Request{Type: "foo"}, nil, true},
-		{&ssh.Request{Type: "shell"}, nil, true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload, err := sshutils.UnmarshalGlobalRequestPayload(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("UnmarshalGlobalRequestPayload(..) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("UnmarshalGlobalRequestPayload(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("UnmarshalGlobalRequestPayload(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-			}
-		})
-	}
-}
-
-func TestUnmarshalX11RequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.X11RequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{x11RequestPayloadBytes, x11RequestPayload, "x11-req: 0", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.X11RequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalX11RequestPayload(t *testing.T) {
-	t.Parallel()
-	output := x11RequestPayload.Marshal()
-	if !bytes.Equal(output, x11RequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, x11RequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalPtyRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.PtyRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{append(ptyRequestPayloadBytes, []byte{0x00, 0x00, 0x00, 0x01, 0x42}...), nil, "", true},
-		{
-			append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...),
-			ptyRequestPayload, "pty-req: xterm, 80x24", false,
-		},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.PtyRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalPtyRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := ptyRequestPayload.Marshal()
-	expectedOutput := make([]byte, 0)
-	expectedOutput = append(expectedOutput, ptyRequestPayloadBytes...)
-	expectedOutput = append(expectedOutput, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...)
-	if !bytes.Equal(output, expectedOutput) {
-		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
-	}
-}
-
-func TestUnmarshalEnvRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.EnvRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{envRequestPayloadBytes, envRequestPayload, "env: foo=bar", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.EnvRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalEnvRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := envRequestPayload.Marshal()
-	if !bytes.Equal(output, envRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, envRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalShellRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.ShellRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, &sshutils.ShellRequestPayload{}, "shell", false},
-		{[]byte{}, &sshutils.ShellRequestPayload{}, "shell", false},
-		{[]byte{0x42}, nil, "", true},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.ShellRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalShellRequestPayload(t *testing.T) {
-	t.Parallel()
-	payload := &sshutils.ShellRequestPayload{}
-	if output, expectedOutput := payload.Marshal(), []byte{}; !bytes.Equal(output, expectedOutput) {
-		t.Errorf("Marshal() = %v, want %v", output, expectedOutput)
-	}
-}
-
-func TestUnmarshalExecRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.ExecRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{execRequestPayloadBytes, execRequestPayload, "exec: /bin/sh", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.ExecRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalExecRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := execRequestPayload.Marshal()
-	if !bytes.Equal(output, execRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, execRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalSubsystemRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.SubsystemRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{subsystemRequestPayloadBytes, subsystemRequestPayload, "subsystem: sftp", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.SubsystemRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalSubsystemRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := subsystemRequestPayload.Marshal()
-	if !bytes.Equal(output, subsystemRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, subsystemRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalWindowChangeRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.WindowChangeRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{windowChangeRequestPayloadBytes, windowChangeRequestPayload, "window-change: 120x80", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.WindowChangeRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalWindowChangeRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := windowChangeRequestPayload.Marshal()
-	if !bytes.Equal(output, windowChangeRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, windowChangeRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalExitStatusRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           []byte
-		expectedPayload *sshutils.ExitStatusRequestPayload
-		expectedString  string
-		expectedError   bool
-	}{
-		{nil, nil, "", true},
-		{[]byte{}, nil, "", true},
-		{[]byte{0x42}, nil, "", true},
-		{exitStatusRequestPayloadBytes, exitStatusRequestPayload, "exit-status: 1", false},
-	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			t.Parallel()
-			payload := new(sshutils.ExitStatusRequestPayload)
-			err := payload.Unmarshal(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("Unmarshal(...) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unmarshal(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("Unmarshal(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-				if payload.String() != testCase.expectedString {
-					t.Errorf("Unmarshal(...).String() = %v, want %v", payload.String(), testCase.expectedString)
-				}
-			}
-		})
-	}
-}
-
-func TestMarshalExitStatusRequestPayload(t *testing.T) {
-	t.Parallel()
-	output := exitStatusRequestPayload.Marshal()
-	if !bytes.Equal(output, exitStatusRequestPayloadBytes) {
-		t.Errorf("Marshal() = %v, want %v", output, exitStatusRequestPayloadBytes)
-	}
-}
-
-func TestUnmarshalChannelRequestPayload(t *testing.T) {
-	t.Parallel()
-	for i, testCase := range []struct {
-		input           *ssh.Request
-		expectedPayload sshutils.Payload
-		expectedError   bool
-	}{
-		{&ssh.Request{Type: "x11-req"}, nil, true},
-		{&ssh.Request{Type: "x11-req", Payload: x11RequestPayloadBytes}, x11RequestPayload, false},
-		{&ssh.Request{Type: "pty-req"}, nil, true},
-		{
-			&ssh.Request{
-				Type:    "pty-req",
-				Payload: append(ptyRequestPayloadBytes, ssh.Marshal(struct{ string }{string(append(terminalModesBytes, 0))})...),
+			"session",
+			&fakeNewChannel{
+				"session",
+				[]byte{},
 			},
-			ptyRequestPayload, false,
+			&sshutils.SessionChannelPayload{},
+			"session",
+			"",
 		},
-		{&ssh.Request{Type: "env"}, nil, true},
-		{&ssh.Request{Type: "env", Payload: envRequestPayloadBytes}, envRequestPayload, false},
-		{&ssh.Request{Type: "shell", Payload: []byte{0x42}}, nil, true},
-		{&ssh.Request{Type: "shell"}, &sshutils.ShellRequestPayload{}, false},
-		{&ssh.Request{Type: "exec"}, nil, true},
-		{&ssh.Request{Type: "exec", Payload: execRequestPayloadBytes}, execRequestPayload, false},
-		{&ssh.Request{Type: "subsystem"}, nil, true},
-		{&ssh.Request{Type: "subsystem", Payload: subsystemRequestPayloadBytes}, subsystemRequestPayload, false},
-		{&ssh.Request{Type: "window-change"}, nil, true},
-		{&ssh.Request{Type: "window-change", Payload: windowChangeRequestPayloadBytes}, windowChangeRequestPayload, false},
-		{&ssh.Request{Type: "exit-status"}, nil, true},
-		{&ssh.Request{Type: "exit-status", Payload: exitStatusRequestPayloadBytes}, exitStatusRequestPayload, false},
-		{&ssh.Request{Type: "foo"}, nil, true},
-		{&ssh.Request{Type: "no-more-sessions@openssh.com"}, nil, true},
+		{
+			"session_invalid_payload",
+			&fakeNewChannel{
+				"session",
+				[]byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: non-empty payload",
+		},
+		{
+			"x11",
+			&fakeNewChannel{
+				"x11",
+				ssh.Marshal(struct {
+					a string
+					b uint32
+				}{"foo", 42}),
+			},
+			&sshutils.X11ChannelPayload{"foo", 42},
+			"x11: foo:42",
+			"",
+		},
+		{
+			"x11_invalid_payload",
+			&fakeNewChannel{
+				"x11",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"forwarded_tcpip",
+			&fakeNewChannel{
+				"forwarded-tcpip",
+				ssh.Marshal(struct {
+					a string
+					b uint32
+					c string
+					d uint32
+				}{"foo", 42, "bar", 43}),
+			},
+			&sshutils.ForwardedTcpipChannelPayload{"foo", 42, "bar", 43},
+			"forwarded-tcpip: bar:43 -> foo:42",
+			"",
+		},
+		{
+			"forwarded_tcpip_invalid_payload",
+			&fakeNewChannel{
+				"forwarded-tcpip",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"direct_tcpip",
+			&fakeNewChannel{
+				"direct-tcpip",
+				ssh.Marshal(struct {
+					a string
+					b uint32
+					c string
+					d uint32
+				}{"foo", 42, "bar", 43}),
+			},
+			&sshutils.DirectTcpipChannelPayload{"foo", 42, "bar", 43},
+			"direct-tcpip: bar:43 -> foo:42",
+			"",
+		},
+		{
+			"direct_tcpip_invalid_payload",
+			&fakeNewChannel{
+				"direct-tcpip",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"tun_ppp",
+			&fakeNewChannel{
+				"tun@openssh.com",
+				ssh.Marshal(struct {
+					a uint32
+					b uint32
+				}{1, 42}),
+			},
+			&sshutils.TunChannelPayload{1, 42},
+			"tun: point-to-point, interface: 42",
+			"",
+		},
+		{
+			"tun_ethernet",
+			&fakeNewChannel{
+				"tun@openssh.com",
+				ssh.Marshal(struct {
+					a uint32
+					b uint32
+				}{2, 42}),
+			},
+			&sshutils.TunChannelPayload{2, 42},
+			"tun: ethernet, interface: 42",
+			"",
+		},
+		{
+			"tun_unknown",
+			&fakeNewChannel{
+				"tun@openssh.com",
+				ssh.Marshal(struct {
+					a uint32
+					b uint32
+				}{3, 42}),
+			},
+			&sshutils.TunChannelPayload{3, 42},
+			"tun: unknown mode (3), interface: 42",
+			"",
+		},
+		{
+			"tun_invalid_payload",
+			&fakeNewChannel{
+				"tun@openssh.com",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"direct_streamlocal",
+			&fakeNewChannel{
+				"direct-streamlocal@openssh.com",
+				ssh.Marshal(struct {
+					a string
+					b string
+					c uint32
+				}{"foo", "bar", 42}),
+			},
+			&sshutils.DirectStreamlocalChannelPayload{"foo", "bar", 42},
+			"direct-streamlocal: foo",
+			"",
+		},
+		{
+			"direct_streamlocal_invalid_payload",
+			&fakeNewChannel{
+				"direct-streamlocal@openssh.com",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"forwarded_streamlocal",
+			&fakeNewChannel{
+				"forwarded-streamlocal@openssh.com",
+				ssh.Marshal(struct {
+					a string
+					b string
+				}{"foo", "bar"}),
+			},
+			&sshutils.ForwardedStreamlocalChannelPayload{"foo", "bar"},
+			"forwarded-streamlocal: foo",
+			"",
+		},
+		{
+			"forwarded_streamlocal_invalid_payload",
+			&fakeNewChannel{
+				"forwarded-streamlocal@openssh.com",
+				[]byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal new channel payload: invalid payload: ssh: parse error",
+		},
+		{
+			"unknown",
+			&fakeNewChannel{
+				"lorem_ipsum",
+				[]byte{42, 43},
+			},
+			&sshutils.UnknownPayload{sshutils.RawPayload{42, 43}, "lorem_ipsum"},
+			"unknown type (lorem_ipsum), payload: 2a2b",
+			"",
+		},
 	} {
-		testCase := testCase
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			payload, err := sshutils.UnmarshalChannelRequestPayload(testCase.input)
-			if testCase.expectedError {
-				if err == nil {
-					t.Errorf("UnmarshalGlobalRequestPayload(..) = %v, want non-nil", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("UnmarshalGlobalRequestPayload(...) = %v, want nil", err)
-				}
-				if !reflect.DeepEqual(payload, testCase.expectedPayload) {
-					t.Errorf("UnmarshalGlobalRequestPayload(...) = %v, want %v", payload, testCase.expectedPayload)
-				}
-			}
+			payload, err := sshutils.UnmarshalNewChannelPayload(tt.newChannel)
+			testPayload(t, tt.newChannel.extraData, payload, err, tt.payload, tt.str, tt.err)
+		})
+	}
+}
+
+func TestGlobalRequestPayload(t *testing.T) {
+	t.Parallel()
+	key1, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	key2, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.ECDSA)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	for _, tt := range []struct {
+		name          string
+		globalRequest *ssh.Request
+		payload       sshutils.Payload
+		str           string
+		err           string
+	}{
+		{
+			"tcpip_forward",
+			&ssh.Request{
+				Type:      "tcpip-forward",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b uint32
+				}{"foo", 42}),
+			},
+			&sshutils.TcpipForwardRequestPayload{"foo", 42},
+			"tcpip-forward: foo:42",
+			"",
+		},
+		{
+			"tcpip_forward_invalid_payload",
+			&ssh.Request{
+				Type:      "tcpip-forward",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"cancel_tcpip_forward",
+			&ssh.Request{
+				Type:      "cancel-tcpip-forward",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b uint32
+				}{"foo", 42}),
+			},
+			&sshutils.CancelTcpipForwardRequestPayload{"foo", 42},
+			"cancel-tcpip-forward: foo:42",
+			"",
+		},
+		{
+			"cancel_tcpip_forward_invalid_payload",
+			&ssh.Request{
+				Type:      "cancel-tcpip-forward",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"no-more-sessions",
+			&ssh.Request{
+				Type:      "no-more-sessions@openssh.com",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			&sshutils.NoMoreSessionsRequestPayload{},
+			"no-more-sessions",
+			"",
+		},
+		{
+			"no-more-sessions_invalid_payload",
+			&ssh.Request{
+				Type:      "no-more-sessions@openssh.com",
+				WantReply: true,
+				Payload:   []byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: non-empty payload",
+		},
+		{
+			"streamlocal_forward",
+			&ssh.Request{
+				Type:      "streamlocal-forward@openssh.com",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			&sshutils.StreamlocalForwardRequestPayload{"foo"},
+			"streamlocal-forward: foo",
+			"",
+		},
+		{
+			"streamlocal_forward_invalid_payload",
+			&ssh.Request{
+				Type:      "streamlocal-forward@openssh.com",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"cancel_streamlocal_forward",
+			&ssh.Request{
+				Type:      "cancel-streamlocal-forward@openssh.com",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			&sshutils.CancelStreamlocalForwardRequestPayload{"foo"},
+			"cancel-streamlocal-forward: foo",
+			"",
+		},
+		{
+			"cancel_streamlocal_forward_invalid_payload",
+			&ssh.Request{
+				Type:      "cancel-streamlocal-forward@openssh.com",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"hostkeys-00",
+			&ssh.Request{
+				Type:      "hostkeys-00@openssh.com",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b string
+				}{string(key1.PublicKey().Marshal()), string(key2.PublicKey().Marshal())}),
+			},
+			&sshutils.HostkeysRequestPayload{sshutils.PublicKeys{key1.PublicKey(), key2.PublicKey()}},
+			fmt.Sprintf("hostkeys: [%v, %v]",
+				ssh.FingerprintSHA256(key1.PublicKey()), ssh.FingerprintSHA256(key2.PublicKey())),
+			"",
+		},
+		{
+			"hostkeys-00_invalid_payload",
+			&ssh.Request{
+				Type:      "hostkeys-00@openssh.com",
+				WantReply: true,
+				Payload:   []byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: failed to unmarshal public keys: " +
+				"failed to unmarshal bytes: ssh: unmarshal error",
+		},
+		{
+			"hostkeys-00_invalid_public_key",
+			&ssh.Request{
+				Type:      "hostkeys-00@openssh.com",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: failed to parse public key: ssh: short read",
+		},
+		{
+			"hostkeys-prove-00",
+			&ssh.Request{
+				Type:      "hostkeys-prove-00@openssh.com",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b string
+				}{string(key1.PublicKey().Marshal()), string(key2.PublicKey().Marshal())}),
+			},
+			&sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key1.PublicKey(), key2.PublicKey()}},
+			fmt.Sprintf("hostkeys-prove: [%v, %v]",
+				ssh.FingerprintSHA256(key1.PublicKey()), ssh.FingerprintSHA256(key2.PublicKey())),
+			"",
+		},
+		{
+			"hostkeys-prove-00_invalid_payload",
+			&ssh.Request{
+				Type:      "hostkeys-prove-00@openssh.com",
+				WantReply: true,
+				Payload:   []byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal global request payload: invalid payload: failed to unmarshal public keys: " +
+				"failed to unmarshal bytes: ssh: unmarshal error",
+		},
+		{
+			"unknown",
+			&ssh.Request{
+				Type:      "lorem_ipsum",
+				WantReply: true,
+				Payload:   []byte{42, 43},
+			},
+			&sshutils.UnknownPayload{sshutils.RawPayload{42, 43}, "lorem_ipsum"},
+			"unknown type (lorem_ipsum), payload: 2a2b",
+			"",
+		},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			payload, err := sshutils.UnmarshalGlobalRequestPayload(tt.globalRequest)
+			testPayload(t, tt.globalRequest.Payload, payload, err, tt.payload, tt.str, tt.err)
+		})
+	}
+}
+
+func TestTcpipForwardRequestPayload(t *testing.T) {
+	t.Parallel()
+	payload := &sshutils.TcpipForwardRequestPayload{"foo", 42}
+	response := payload.Response(43)
+	expectedResponse := ssh.Marshal(struct{ uint32 }{43})
+	if !bytes.Equal(response, expectedResponse) {
+		t.Errorf("Response() = %v, want %v", response, expectedResponse)
+	}
+}
+
+type fakeRandReader struct {
+	fail bool
+}
+
+func (r *fakeRandReader) Read(p []byte) (int, error) {
+	if r.fail {
+		return 0, errors.New("fake error")
+	}
+	for i := range p {
+		p[i] = 42
+	}
+	return len(p), nil
+}
+
+func TestHostkeysProveRequestPayload(t *testing.T) {
+	t.Parallel()
+	key1, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	signature1, err := key1.Sign(&fakeRandReader{false}, ssh.Marshal(struct {
+		a string
+		b string
+		c string
+	}{"hostkeys-prove-00@openssh.com", "foo", string(key1.PublicKey().Marshal())}))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+	key2, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.ECDSA)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	signature2, err := key2.Sign(&fakeRandReader{false}, ssh.Marshal(struct {
+		a string
+		b string
+		c string
+	}{"hostkeys-prove-00@openssh.com", "foo", string(key2.PublicKey().Marshal())}))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key1.PublicKey(), key2.PublicKey()}}
+	response, err := payload.Response(&fakeRandReader{false}, []*sshutils.HostKey{key1, key2}, []byte("foo"))
+	if err != nil {
+		t.Fatalf("Response() error = %v", err)
+	}
+	expectedResponse := ssh.Marshal(struct {
+		a string
+		b string
+	}{
+		string(ssh.Marshal(signature1)),
+		string(ssh.Marshal(signature2)),
+	})
+	if !bytes.Equal(response, expectedResponse) {
+		t.Errorf("Response() = %v, want %v", response, expectedResponse)
+	}
+	if err := payload.VerifyResponse(response, []byte("foo")); err != nil {
+		t.Errorf("VerifyResponse() error = %v", err)
+	}
+}
+
+func TestHostkeysProveRequestPayloadResponse_NotFound(t *testing.T) {
+	t.Parallel()
+	key, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key.PublicKey()}}
+	expectedError := "invalid payload: no matching host key"
+	_, err = payload.Response(&fakeRandReader{false}, []*sshutils.HostKey{}, []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Response() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestHostkeysProveRequestPayloadResponse_SignError(t *testing.T) {
+	t.Parallel()
+	key, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.ECDSA)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key.PublicKey()}}
+	expectedError := "failed to sign data: fake error"
+	_, err = payload.Response(&fakeRandReader{true}, []*sshutils.HostKey{key}, []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("Response() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestHostkeysProveRequestPayloadVerifyResponse_InvalidPayload(t *testing.T) {
+	t.Parallel()
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{}}
+	expectedError := "invalid payload: failed to unmarshal bytes: ssh: unmarshal error"
+	err := payload.VerifyResponse([]byte{42}, []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("VerifyResponse() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestHostkeysProveRequestPayloadVerifyResponse_InvalidCount(t *testing.T) {
+	t.Parallel()
+	key, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key.PublicKey()}}
+	expectedError := "invalid payload: invalid number of signatures"
+	err = payload.VerifyResponse([]byte{}, []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("VerifyResponse() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestHostkeysProveRequestPayloadVerifyResponse_InvalidSignaturePayload(t *testing.T) {
+	t.Parallel()
+	key, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	payload := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key.PublicKey()}}
+	expectedError := "invalid payload: ssh: unmarshal error"
+	err = payload.VerifyResponse(ssh.Marshal(struct{ string }{"foo"}), []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("VerifyResponse() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestHostkeysProveRequestPayloadVerifyResponse_InvalidSignature(t *testing.T) {
+	t.Parallel()
+	key1, err := sshutils.GenerateHostKey(&fakeRandReader{false}, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	key2, err := sshutils.GenerateHostKey(rand.Reader, sshutils.Ed25519)
+	if err != nil {
+		t.Fatalf("GenerateHostKey() error = %v", err)
+	}
+	payload1 := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key1.PublicKey()}}
+	payload2 := &sshutils.HostkeysProveRequestPayload{sshutils.PublicKeys{key2.PublicKey()}}
+	response, err := payload2.Response(&fakeRandReader{false}, []*sshutils.HostKey{key2}, []byte("foo"))
+	if err != nil {
+		t.Fatalf("Response() error = %v", err)
+	}
+	expectedError := "invalid payload: ssh: signature did not verify"
+	err = payload1.VerifyResponse(response, []byte("foo"))
+	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
+		t.Errorf("VerifyResponse() error = %v, want %v", err, expectedError)
+	}
+}
+
+func TestChannelRequestPayload(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name           string
+		channelRequest *ssh.Request
+		payload        sshutils.Payload
+		str            string
+		err            string
+	}{
+		{
+			"pty-req",
+			&ssh.Request{
+				Type:      "pty-req",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b uint32
+					c uint32
+					d uint32
+					e uint32
+					f string
+				}{"foo", 42, 43, 44, 45, string([]byte{1, 0, 0, 0, 42, 0})}),
+			},
+			&sshutils.PtyRequestPayload{"foo", 42, 43, 44, 45, ssh.TerminalModes{1: 42}},
+			"pty-req: foo, 42x43",
+			"",
+		},
+		{
+			"pty-req_invalid_payload",
+			&ssh.Request{
+				Type:      "pty-req",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"pty-req_invalid_terminal_modes",
+			&ssh.Request{
+				Type:      "pty-req",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b uint32
+					c uint32
+					d uint32
+					e uint32
+					f string
+				}{"foo", 42, 43, 44, 45, string([]byte{1})}),
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"x11-req",
+			&ssh.Request{
+				Type:      "x11-req",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a bool
+					b string
+					c string
+					d uint32
+				}{true, "foo", "bar", 42}),
+			},
+			&sshutils.X11RequestPayload{true, "foo", "bar", 42},
+			"x11-req: 42",
+			"",
+		},
+		{
+			"x11-req_invalid_payload",
+			&ssh.Request{
+				Type:      "x11-req",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"env",
+			&ssh.Request{
+				Type:      "env",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b string
+				}{"foo", "bar"}),
+			},
+			&sshutils.EnvRequestPayload{"foo", "bar"},
+			"env: foo=bar",
+			"",
+		},
+		{
+			"env_invalid_payload",
+			&ssh.Request{
+				Type:      "env",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"shell",
+			&ssh.Request{
+				Type:      "shell",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			&sshutils.ShellRequestPayload{},
+			"shell",
+			"",
+		},
+		{
+			"shell_invalid_payload",
+			&ssh.Request{
+				Type:      "shell",
+				WantReply: true,
+				Payload:   []byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: non-empty payload",
+		},
+		{
+			"exec",
+			&ssh.Request{
+				Type:      "exec",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			&sshutils.ExecRequestPayload{"foo"},
+			"exec: foo",
+			"",
+		},
+		{
+			"exec_invalid_payload",
+			&ssh.Request{
+				Type:      "exec",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"subsystem",
+			&ssh.Request{
+				Type:      "subsystem",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			&sshutils.SubsystemRequestPayload{"foo"},
+			"subsystem: foo",
+			"",
+		},
+		{
+			"subsystem_invalid_payload",
+			&ssh.Request{
+				Type:      "subsystem",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"window-change",
+			&ssh.Request{
+				Type:      "window-change",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a uint32
+					b uint32
+					c uint32
+					d uint32
+				}{42, 43, 44, 45}),
+			},
+			&sshutils.WindowChangeRequestPayload{42, 43, 44, 45},
+			"window-change: 42x43",
+			"",
+		},
+		{
+			"window-change_invalid_payload",
+			&ssh.Request{
+				Type:      "window-change",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"xon-xoff",
+			&ssh.Request{
+				Type:      "xon-xoff",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a bool
+				}{true}),
+			},
+			&sshutils.XonXoffRequestPayload{true},
+			"xon-xoff: true",
+			"",
+		},
+		{
+			"xon-xoff_invalid_payload",
+			&ssh.Request{
+				Type:      "xon-xoff",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"signal",
+			&ssh.Request{
+				Type:      "signal",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+				}{"foo"}),
+			},
+			&sshutils.SignalRequestPayload{"foo"},
+			"signal: foo",
+			"",
+		},
+		{
+			"signal_invalid_payload",
+			&ssh.Request{
+				Type:      "signal",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"exit-status",
+			&ssh.Request{
+				Type:      "exit-status",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a uint32
+				}{42}),
+			},
+			&sshutils.ExitStatusRequestPayload{42},
+			"exit-status: 42",
+			"",
+		},
+		{
+			"exit-status_invalid_payload",
+			&ssh.Request{
+				Type:      "exit-status",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"exit-signal",
+			&ssh.Request{
+				Type:      "exit-signal",
+				WantReply: true,
+				Payload: ssh.Marshal(struct {
+					a string
+					b bool
+					c string
+					d string
+				}{"foo", true, "bar", "baz"}),
+			},
+			&sshutils.ExitSignalRequestPayload{"foo", true, "bar", "baz"},
+			"exit-signal: foo",
+			"",
+		},
+		{
+			"exit-signal_invalid_payload",
+			&ssh.Request{
+				Type:      "exit-signal",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: ssh: parse error",
+		},
+		{
+			"eow",
+			&ssh.Request{
+				Type:      "eow@openssh.com",
+				WantReply: true,
+				Payload:   []byte{},
+			},
+			&sshutils.EowRequestPayload{},
+			"eow",
+			"",
+		},
+		{
+			"eow_invalid_payload",
+			&ssh.Request{
+				Type:      "eow@openssh.com",
+				WantReply: true,
+				Payload:   []byte{42},
+			},
+			nil,
+			"",
+			"failed to unmarshal channel request payload: invalid payload: non-empty payload",
+		},
+		{
+			"unknown",
+			&ssh.Request{
+				Type:      "lorem_ipsum",
+				WantReply: true,
+				Payload:   []byte{42, 43},
+			},
+			&sshutils.UnknownPayload{sshutils.RawPayload{42, 43}, "lorem_ipsum"},
+			"unknown type (lorem_ipsum), payload: 2a2b",
+			"",
+		},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			payload, err := sshutils.UnmarshalChannelRequestPayload(tt.channelRequest)
+			testPayload(t, tt.channelRequest.Payload, payload, err, tt.payload, tt.str, tt.err)
 		})
 	}
 }
