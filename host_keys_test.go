@@ -99,7 +99,7 @@ func TestGenerateHostKey_Error(t *testing.T) {
 func TestLoadHostKey_MissingFile(t *testing.T) {
 	t.Parallel()
 	_, err := sshutils.LoadHostKey("missing")
-	expectedError := "invalid key file: open missing: no such file or directory"
+	expectedError := "invalid key file: open missing"
 	if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
 		t.Errorf("LoadHostKey() error = %v, want %v", err, expectedError)
 	}
@@ -145,7 +145,7 @@ func TestSave_InvalidFile(t *testing.T) {
 		t.Fatalf("GenerateHostKey() error = %v", err)
 	}
 	keyFile := t.TempDir()
-	expectedError := fmt.Sprintf("invalid key file: open %v: file exists", keyFile)
+	expectedError := fmt.Sprintf("invalid key file: open %v", keyFile)
 	if err := key.Save(keyFile); err == nil || !strings.HasPrefix(err.Error(), expectedError) {
 		t.Errorf("Save() error = %v, want %v", err, expectedError)
 	}
