@@ -255,8 +255,8 @@ func TestConn(t *testing.T) {
 		defer wg.Done()
 		newChannel := <-clientConn.NewChannels
 		clientConn.Close()
-		_, err = newChannel.AcceptChannel()
-		expectedError = "failed to open channel"
+		_, err := newChannel.AcceptChannel()
+		expectedError := "failed to open channel"
 		if err == nil || !strings.HasPrefix(err.Error(), expectedError) {
 			t.Errorf("AcceptChannel() error = %v, want %v", err, expectedError)
 		}
