@@ -1,23 +1,23 @@
 linters:
   enable-all: true
   disable:
-    - exhaustivestruct
     - wsl
-    - ireturn
     - nlreturn
+    - ireturn
     - varnamelen
 issues:
   exclude-rules:
-    - linters:
-        - paralleltest
-      text: "does not use range value in test Run"
-    - path: _test\.go
+    - path: ^serialization\.go$
       linters:
-        - nestif
-        - dupl
-        - gosec
+        - maligned
+    - path: _test\.go$
+      linters:
+        - funlen
+        - maligned
         - cyclop
-        - gochecknoglobals
-        - gochecknoinits
         - goerr113
-        - nilnil
+        - maintidx
+        - gocognit
+        - gosec
+        - gocyclo
+        - nestif
