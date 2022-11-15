@@ -201,6 +201,7 @@ func handleChannel(sshChannel ssh.Channel, sshRequests <-chan *ssh.Request, conn
 		for request := range sshRequests {
 			requests <- &ChannelRequest{request, channel}
 		}
+		close(requests)
 	}()
 	conn.nextChannelID++
 	return channel
