@@ -1,0 +1,5 @@
+{
+	"name": "Debian",
+	"image": "mcr.microsoft.com/devcontainers/base:testing",
+	"remoteUser": "root"
+}
