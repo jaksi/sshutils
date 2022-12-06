@@ -1,5 +1,5 @@
 {
 	"name": "Debian",
-	"image": "mcr.microsoft.com/devcontainers/base:testing",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
 	"remoteUser": "root"
 }
