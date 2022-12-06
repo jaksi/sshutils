@@ -1,5 +1,9 @@
 {
-	"name": "Debian",
-	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
-	"remoteUser": "root"
+	"name": "Ubuntu",
+	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/go:1": {}
+	}
+	// "remoteUser": "root"
 }
