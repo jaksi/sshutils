@@ -2,7 +2,6 @@ package sshutils
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -10,11 +9,29 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var (
-	ErrEstablishSSH = errors.New("failed to establish SSH connection")
-	ErrSendRequest  = errors.New("failed to send request")
-	ErrChannelOpen  = errors.New("failed to open channel")
-)
+type EstablishError struct {
+	err error
+}
+
+func (e EstablishError) Error() string {
+	return fmt.Sprintf("failed to establish SSH connection: %v", e.err)
+}
+
+type SendRequestError struct {
+	err error
+}
+
+func (e SendRequestError) Error() string {
+	return fmt.Sprintf("failed to send request: %v", e.err)
+}
+
+type ChannelOpenError struct {
+	err error
+}
+
+func (e ChannelOpenError) Error() string {
+	return fmt.Sprintf("failed to open channel: %v", e.err)
+}
 
 type Listener struct {
 	net.Listener
@@ -29,7 +46,7 @@ func (listener *Listener) Accept() (*Conn, error) {
 	sshConn, sshNewChannels, sshRequests, err := ssh.NewServerConn(conn, &listener.config)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("%w: %v", ErrEstablishSSH, err)
+		return nil, EstablishError{err}
 	}
 	return handleConn(sshConn, sshNewChannels, sshRequests), nil
 }
@@ -52,7 +69,7 @@ type Conn struct {
 func (conn *Conn) RawChannel(name string, payload []byte) (*Channel, error) {
 	sshChannel, sshRequests, err := conn.Conn.OpenChannel(name, payload)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrChannelOpen, err)
+		return nil, ChannelOpenError{err}
 	}
 	return handleChannel(sshChannel, sshRequests, conn, name), nil
 }
@@ -68,7 +85,7 @@ func (conn *Conn) Channel(name string, payload Payload) (*Channel, error) {
 func (conn *Conn) RawRequest(name string, wantReply bool, payload []byte) (bool, []byte, error) {
 	accepted, reply, err := conn.SendRequest(name, wantReply, payload)
 	if err != nil {
-		return false, nil, fmt.Errorf("%w: %v", ErrSendRequest, err)
+		return false, nil, SendRequestError{err}
 	}
 	return accepted, reply, nil
 }
@@ -93,7 +110,7 @@ func Dial(address string, config *ssh.ClientConfig) (*Conn, error) {
 	sshConn, sshNewChannels, sshRequests, err := ssh.NewClientConn(conn, address, config)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("%w: %v", ErrEstablishSSH, err)
+		return nil, EstablishError{err}
 	}
 	return handleConn(sshConn, sshNewChannels, sshRequests), nil
 }
@@ -138,7 +155,7 @@ type NewChannel struct {
 func (newChannel *NewChannel) AcceptChannel() (*Channel, error) {
 	sshChannel, sshRequests, err := newChannel.Accept()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrChannelOpen, err)
+		return nil, ChannelOpenError{err}
 	}
 	return handleChannel(sshChannel, sshRequests, newChannel.conn, newChannel.ChannelType()), nil
 }
@@ -178,7 +195,7 @@ func (channel *Channel) ConnMetadata() ssh.ConnMetadata {
 func (channel *Channel) RawRequest(name string, wantReply bool, payload []byte) (bool, error) {
 	accepted, err := channel.SendRequest(name, wantReply, payload)
 	if err != nil {
-		return false, fmt.Errorf("%w: %v", ErrSendRequest, err)
+		return false, SendRequestError{err}
 	}
 	return accepted, nil
 }

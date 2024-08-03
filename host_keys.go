@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,11 +19,29 @@ const (
 	hostKeyFilePerms = 0o600
 )
 
-var (
-	ErrInvalidKey         = errors.New("invalid key")
-	ErrInvalidKeyFile     = errors.New("invalid key file")
-	ErrUnsupportedKeyType = errors.New("unsupported key type")
-)
+type InvalidKeyError struct {
+	err error
+}
+
+func (e InvalidKeyError) Error() string {
+	return fmt.Sprintf("invalid key: %v", e.err)
+}
+
+type InvalidKeyFileError struct {
+	err error
+}
+
+func (e InvalidKeyFileError) Error() string {
+	return fmt.Sprintf("invalid key file: %v", e.err)
+}
+
+type UnsupportedKeyTypeError struct {
+	t KeyType
+}
+
+func (e UnsupportedKeyTypeError) Error() string {
+	return fmt.Sprintf("unsupported key type: %v", e.t)
+}
 
 type KeyType int
 
@@ -59,7 +76,7 @@ func (key *HostKey) String() string {
 func hostKeyFromKey(key interface{}) (*HostKey, error) {
 	signer, err := ssh.NewSignerFromKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidKey, err)
+		return nil, InvalidKeyError{err}
 	}
 	return &HostKey{
 		Signer: signer,
@@ -78,10 +95,10 @@ func GenerateHostKey(rand io.Reader, t KeyType) (*HostKey, error) {
 	case Ed25519:
 		_, key, err = ed25519.GenerateKey(rand)
 	default:
-		return nil, fmt.Errorf("%w: %v", ErrUnsupportedKeyType, t)
+		return nil, UnsupportedKeyTypeError{t}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidKey, err)
+		return nil, InvalidKeyError{err}
 	}
 	return hostKeyFromKey(key)
 }
@@ -89,11 +106,11 @@ func GenerateHostKey(rand io.Reader, t KeyType) (*HostKey, error) {
 func LoadHostKey(fileName string) (*HostKey, error) {
 	keyBytes, err := os.ReadFile(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
+		return nil, InvalidKeyFileError{err}
 	}
 	key, err := ssh.ParseRawPrivateKey(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
+		return nil, InvalidKeyFileError{err}
 	}
 	return hostKeyFromKey(key)
 }
@@ -101,19 +118,19 @@ func LoadHostKey(fileName string) (*HostKey, error) {
 func (key *HostKey) Save(fileName string) error {
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, hostKeyFilePerms) //nolint:nosnakecase
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
+		return InvalidKeyFileError{err}
 	}
 	defer file.Close()
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(key.key)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidKey, err)
+		return InvalidKeyError{err}
 	}
 	if _, err = file.Write(pem.EncodeToMemory(&pem.Block{
 		Type:    "PRIVATE KEY",
 		Headers: nil,
 		Bytes:   keyBytes,
 	})); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidKeyFile, err)
+		return InvalidKeyFileError{err}
 	}
 	return nil
 }

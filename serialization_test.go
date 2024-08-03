@@ -517,7 +517,7 @@ type fakeRandReader struct {
 
 func (r *fakeRandReader) Read(p []byte) (int, error) {
 	if r.fail {
-		return 0, errors.New("fake error")
+		return 0, errors.New("fake error") //nolint:err113
 	}
 	for i := range p {
 		p[i] = 42
