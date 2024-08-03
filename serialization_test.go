@@ -268,7 +268,6 @@ func TestNewChannelPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalNewChannelPayload(tt.newChannel)
@@ -493,7 +492,6 @@ func TestGlobalRequestPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalGlobalRequestPayload(tt.globalRequest)
@@ -999,7 +997,6 @@ func TestChannelRequestPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalChannelRequestPayload(tt.channelRequest)

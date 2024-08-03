@@ -50,7 +50,6 @@ func TestGenerateHostKey(t *testing.T) {
 			"unsupported key type: unknown type (42)",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if tt.keyType.String() != tt.keyTypeString {
