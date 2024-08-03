@@ -8,12 +8,25 @@ import (
 	"io"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
 
-var errInvalidPayload = errors.New("invalid payload")
+var (
+	errNonEmptyPayload           = errors.New("non-empty payload")
+	errNoMatchingHostKey         = errors.New("no matching host key")
+	errInvalidNumberOfSignatures = errors.New("invalid number of signatures")
+)
+
+type InvalidPayloadError struct {
+	err error
+}
+
+func (e InvalidPayloadError) Error() string {
+	return fmt.Sprintf("invalid payload: %v", e.err)
+}
 
 type Payload interface {
 	fmt.Stringer
@@ -62,7 +75,7 @@ func (payload *SessionChannelPayload) String() string {
 
 func (payload *SessionChannelPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return fmt.Errorf("%w: non-empty payload", errInvalidPayload)
+		return InvalidPayloadError{errNonEmptyPayload}
 	}
 	return nil
 }
@@ -83,12 +96,12 @@ type X11ChannelPayload struct {
 
 func (payload *X11ChannelPayload) String() string {
 	return fmt.Sprintf("x11: %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)))
 }
 
 func (payload *X11ChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -111,13 +124,13 @@ type ForwardedTcpipChannelPayload struct {
 
 func (payload *ForwardedTcpipChannelPayload) String() string {
 	return fmt.Sprintf("forwarded-tcpip: %v -> %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)),
-		net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)),
+		net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *ForwardedTcpipChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -140,13 +153,13 @@ type DirectTcpipChannelPayload struct {
 
 func (payload *DirectTcpipChannelPayload) String() string {
 	return fmt.Sprintf("direct-tcpip: %v -> %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)),
-		net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)),
+		net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *DirectTcpipChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -188,7 +201,7 @@ func (payload *TunChannelPayload) String() string {
 
 func (payload *TunChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -214,7 +227,7 @@ func (payload *DirectStreamlocalChannelPayload) String() string {
 
 func (payload *DirectStreamlocalChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -239,7 +252,7 @@ func (payload *ForwardedStreamlocalChannelPayload) String() string {
 
 func (payload *ForwardedStreamlocalChannelPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -291,12 +304,12 @@ type tcpipRequestPayload struct {
 type TcpipForwardRequestPayload tcpipRequestPayload
 
 func (payload *TcpipForwardRequestPayload) String() string {
-	return fmt.Sprintf("tcpip-forward: %v", net.JoinHostPort(payload.Address, fmt.Sprint(payload.Port)))
+	return fmt.Sprintf("tcpip-forward: %v", net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *TcpipForwardRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -317,12 +330,13 @@ func (payload *TcpipForwardRequestPayload) Response(port uint32) []byte {
 type CancelTcpipForwardRequestPayload tcpipRequestPayload
 
 func (payload *CancelTcpipForwardRequestPayload) String() string {
-	return fmt.Sprintf("cancel-tcpip-forward: %v", net.JoinHostPort(payload.Address, fmt.Sprint(payload.Port)))
+	return fmt.Sprintf("cancel-tcpip-forward: %v",
+		net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *CancelTcpipForwardRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -344,7 +358,7 @@ func (payload *NoMoreSessionsRequestPayload) String() string {
 
 func (payload *NoMoreSessionsRequestPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return fmt.Errorf("%w: non-empty payload", errInvalidPayload)
+		return InvalidPayloadError{errNonEmptyPayload}
 	}
 	return nil
 }
@@ -370,7 +384,7 @@ func (payload *StreamlocalForwardRequestPayload) String() string {
 
 func (payload *StreamlocalForwardRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -392,7 +406,7 @@ func (payload *CancelStreamlocalForwardRequestPayload) String() string {
 
 func (payload *CancelStreamlocalForwardRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -476,7 +490,7 @@ func (payload *HostkeysRequestPayload) String() string {
 func (payload *HostkeysRequestPayload) Unmarshal(data []byte) error {
 	publicKeys, err := unmarshalPublicKeys(data)
 	if err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	payload.Hostkeys = publicKeys
 	return nil
@@ -500,7 +514,7 @@ func (payload *HostkeysProveRequestPayload) String() string {
 func (payload *HostkeysProveRequestPayload) Unmarshal(data []byte) error {
 	publicKeys, err := unmarshalPublicKeys(data)
 	if err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	payload.Hostkeys = publicKeys
 	return nil
@@ -537,7 +551,7 @@ func (payload *HostkeysProveRequestPayload) Response(
 			}
 		}
 		if signature == nil {
-			return nil, fmt.Errorf("%w: no matching host key", errInvalidPayload)
+			return nil, InvalidPayloadError{errNoMatchingHostKey}
 		}
 		responseBytes[i] = ssh.Marshal(signature)
 	}
@@ -547,18 +561,18 @@ func (payload *HostkeysProveRequestPayload) Response(
 func (payload *HostkeysProveRequestPayload) VerifyResponse(response []byte, sessionID []byte) error {
 	signatureBytes, err := unmarshalBytes(response)
 	if err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	if len(signatureBytes) != len(payload.Hostkeys) {
-		return fmt.Errorf("%w: invalid number of signatures", errInvalidPayload)
+		return InvalidPayloadError{errInvalidNumberOfSignatures}
 	}
 	for i, b := range signatureBytes {
 		signature := new(ssh.Signature)
 		if err := ssh.Unmarshal(b, signature); err != nil {
-			return fmt.Errorf("%w: %v", errInvalidPayload, err)
+			return InvalidPayloadError{err}
 		}
 		if err := payload.Hostkeys[i].Verify(hostkeySignatureData(payload.Hostkeys[i], sessionID), signature); err != nil {
-			return fmt.Errorf("%w: %v", errInvalidPayload, err)
+			return InvalidPayloadError{err}
 		}
 	}
 	return nil
@@ -624,7 +638,7 @@ type rawPtyRequestPayload struct {
 func (payload *PtyRequestPayload) Unmarshal(data []byte) error {
 	var raw rawPtyRequestPayload
 	if err := ssh.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	rawTerminalModes := []byte(raw.TerminalModes)
 	terminalModes := ssh.TerminalModes{}
@@ -642,7 +656,7 @@ func (payload *PtyRequestPayload) Unmarshal(data []byte) error {
 			Rest     []byte `ssh:"rest"`
 		}
 		if err := ssh.Unmarshal(opcode.Rest, &argument); err != nil {
-			return fmt.Errorf("%w: %v", errInvalidPayload, err)
+			return InvalidPayloadError{err}
 		}
 		terminalModes[opcode.Opcode] = argument.Argument
 		rawTerminalModes = argument.Rest
@@ -698,7 +712,7 @@ func (payload *X11RequestPayload) String() string {
 
 func (payload *X11RequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -723,7 +737,7 @@ func (payload *EnvRequestPayload) String() string {
 
 func (payload *EnvRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -745,7 +759,7 @@ func (payload *ShellRequestPayload) String() string {
 
 func (payload *ShellRequestPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return fmt.Errorf("%w: non-empty payload", errInvalidPayload)
+		return InvalidPayloadError{errNonEmptyPayload}
 	}
 	return nil
 }
@@ -769,7 +783,7 @@ func (payload *ExecRequestPayload) String() string {
 
 func (payload *ExecRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -793,7 +807,7 @@ func (payload *SubsystemRequestPayload) String() string {
 
 func (payload *SubsystemRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -820,7 +834,7 @@ func (payload *WindowChangeRequestPayload) String() string {
 
 func (payload *WindowChangeRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -844,7 +858,7 @@ func (payload *XonXoffRequestPayload) String() string {
 
 func (payload *XonXoffRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -868,7 +882,7 @@ func (payload *SignalRequestPayload) String() string {
 
 func (payload *SignalRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -892,7 +906,7 @@ func (payload *ExitStatusRequestPayload) String() string {
 
 func (payload *ExitStatusRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -919,7 +933,7 @@ func (payload *ExitSignalRequestPayload) String() string {
 
 func (payload *ExitSignalRequestPayload) Unmarshal(data []byte) error {
 	if err := ssh.Unmarshal(data, payload); err != nil {
-		return fmt.Errorf("%w: %v", errInvalidPayload, err)
+		return InvalidPayloadError{err}
 	}
 	return nil
 }
@@ -941,7 +955,7 @@ func (payload *EowRequestPayload) String() string {
 
 func (payload *EowRequestPayload) Unmarshal(data []byte) error {
 	if len(data) != 0 {
-		return fmt.Errorf("%w: non-empty payload", errInvalidPayload)
+		return InvalidPayloadError{errNonEmptyPayload}
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	//nolint:depguard
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )
@@ -22,7 +23,7 @@ func (newChannel *fakeNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, er
 	panic("not implemented")
 }
 
-func (newChannel *fakeNewChannel) Reject(reason ssh.RejectionReason, message string) error {
+func (newChannel *fakeNewChannel) Reject(_ ssh.RejectionReason, _ string) error {
 	panic("not implemented")
 }
 
@@ -268,7 +269,6 @@ func TestNewChannelPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalNewChannelPayload(tt.newChannel)
@@ -493,7 +493,6 @@ func TestGlobalRequestPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalGlobalRequestPayload(tt.globalRequest)
@@ -518,7 +517,7 @@ type fakeRandReader struct {
 
 func (r *fakeRandReader) Read(p []byte) (int, error) {
 	if r.fail {
-		return 0, errors.New("fake error")
+		return 0, errors.New("fake error") //nolint:err113
 	}
 	for i := range p {
 		p[i] = 42
@@ -999,7 +998,6 @@ func TestChannelRequestPayload(t *testing.T) {
 			"",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := sshutils.UnmarshalChannelRequestPayload(tt.channelRequest)
