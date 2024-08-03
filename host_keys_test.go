@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	//nolint:depguard
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )

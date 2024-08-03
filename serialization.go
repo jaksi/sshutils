@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -83,7 +84,7 @@ type X11ChannelPayload struct {
 
 func (payload *X11ChannelPayload) String() string {
 	return fmt.Sprintf("x11: %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)))
 }
 
 func (payload *X11ChannelPayload) Unmarshal(data []byte) error {
@@ -111,8 +112,8 @@ type ForwardedTcpipChannelPayload struct {
 
 func (payload *ForwardedTcpipChannelPayload) String() string {
 	return fmt.Sprintf("forwarded-tcpip: %v -> %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)),
-		net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)),
+		net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *ForwardedTcpipChannelPayload) Unmarshal(data []byte) error {
@@ -140,8 +141,8 @@ type DirectTcpipChannelPayload struct {
 
 func (payload *DirectTcpipChannelPayload) String() string {
 	return fmt.Sprintf("direct-tcpip: %v -> %v",
-		net.JoinHostPort(payload.OriginatorAddress, fmt.Sprintf("%v", payload.OriginatorPort)),
-		net.JoinHostPort(payload.Address, fmt.Sprintf("%v", payload.Port)))
+		net.JoinHostPort(payload.OriginatorAddress, strconv.FormatInt(int64(payload.OriginatorPort), 10)),
+		net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *DirectTcpipChannelPayload) Unmarshal(data []byte) error {
@@ -291,7 +292,7 @@ type tcpipRequestPayload struct {
 type TcpipForwardRequestPayload tcpipRequestPayload
 
 func (payload *TcpipForwardRequestPayload) String() string {
-	return fmt.Sprintf("tcpip-forward: %v", net.JoinHostPort(payload.Address, fmt.Sprint(payload.Port)))
+	return fmt.Sprintf("tcpip-forward: %v", net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *TcpipForwardRequestPayload) Unmarshal(data []byte) error {
@@ -317,7 +318,7 @@ func (payload *TcpipForwardRequestPayload) Response(port uint32) []byte {
 type CancelTcpipForwardRequestPayload tcpipRequestPayload
 
 func (payload *CancelTcpipForwardRequestPayload) String() string {
-	return fmt.Sprintf("cancel-tcpip-forward: %v", net.JoinHostPort(payload.Address, fmt.Sprint(payload.Port)))
+	return fmt.Sprintf("cancel-tcpip-forward: %v", net.JoinHostPort(payload.Address, strconv.FormatInt(int64(payload.Port), 10)))
 }
 
 func (payload *CancelTcpipForwardRequestPayload) Unmarshal(data []byte) error {

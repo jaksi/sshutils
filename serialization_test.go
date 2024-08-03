@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	//nolint:depguard
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )
@@ -22,7 +23,7 @@ func (newChannel *fakeNewChannel) Accept() (ssh.Channel, <-chan *ssh.Request, er
 	panic("not implemented")
 }
 
-func (newChannel *fakeNewChannel) Reject(reason ssh.RejectionReason, message string) error {
+func (newChannel *fakeNewChannel) Reject(_ ssh.RejectionReason, _ string) error {
 	panic("not implemented")
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -196,7 +197,7 @@ func (channel *Channel) String() string {
 
 func handleChannel(sshChannel ssh.Channel, sshRequests <-chan *ssh.Request, conn *Conn, name string) *Channel {
 	requests := make(chan *ChannelRequest)
-	channel := &Channel{sshChannel, requests, fmt.Sprint(conn.nextChannelID), name, conn}
+	channel := &Channel{sshChannel, requests, strconv.FormatInt(int64(conn.nextChannelID), 10), name, conn}
 	go func() {
 		for request := range sshRequests {
 			requests <- &ChannelRequest{request, channel}

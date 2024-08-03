@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	//nolint:depguard
 	"github.com/jaksi/sshutils"
 	"golang.org/x/crypto/ssh"
 )
